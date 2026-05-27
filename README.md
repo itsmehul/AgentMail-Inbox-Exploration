@@ -1,6 +1,6 @@
 # Jill DIY — Email Orchestrator
 
-https://base-agentmailtest-ilooma-d82018-95-216-192-198.traefik.me
+https://agent-mail-inbox-exploration.vercel.app/inbox
 
 Prototype for monitoring hiring-pipeline email threads, approving agent drafts, unblocking stuck automation, and scoring pipeline stages. Built as a take-home exercise extending the original HTML mock (`jill-diy-v12 (1).html`).
 
