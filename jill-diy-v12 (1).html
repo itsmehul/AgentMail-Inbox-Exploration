@@ -1,0 +1,2705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jack — Email Agent · Zenlabs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafaf9;
+    --panel: #ffffff;
+    --ink: #0a0a0a;
+    --ink-muted: #71717a;
+    --ink-faint: #a1a1aa;
+    --border: #e7e5e4;
+    --border-strong: #d6d3d1;
+    --hover: #f5f5f4;
+    --active: #f5f5f4;
+    --accent: #18181b;
+    --zen: #8b5cf6;
+    --zen-bg: #f5f3ff;
+    --node-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.04);
+    --node-shadow-hover: 0 4px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.06);
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans);
+    -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01";
+    overflow: hidden;
+  }
+  body { height: 100vh; }
+  a, button { font-family: inherit; cursor: pointer; }
+  input, textarea, select { font-family: inherit; }
+
+  /* ============ TOPBAR ============ */
+  .topbar {
+    height: 56px; border-bottom: 1px solid var(--border);
+    background: var(--panel); display: flex; align-items: center;
+    padding: 0 16px 0 0; gap: 10px; position: relative; z-index: 50;
+  }
+  .topbar-left {
+    width: 248px; padding: 0 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 700; letter-spacing: -0.02em;
+    height: 100%; border-right: 1px solid var(--border);
+  }
+  .topbar-left .logo {
+    width: 26px; height: 26px;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    border-radius: 7px;
+    display: grid; place-items: center;
+    color: white; font-family: var(--mono); font-size: 12px; font-weight: 700;
+  }
+  .topbar-crumb {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 500; color: var(--ink); margin-left: 4px;
+  }
+  .topbar-crumb .ic {
+    width: 22px; height: 22px; border: 1px solid var(--border);
+    border-radius: 5px; display: grid; place-items: center; color: var(--ink-muted);
+  }
+  .topbar-crumb .sep { color: var(--ink-faint); margin: 0 2px; }
+  .topbar-crumb .branch-pill {
+    margin-left: 8px; padding: 3px 9px; border-radius: 999px;
+    background: #ecfdf5; color: #047857;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .topbar-crumb .branch-pill::before {
+    content: ''; width: 6px; height: 6px; background: #10b981; border-radius: 50%;
+  }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .topbar-right .badge { font-size: 12px; font-weight: 500; padding: 5px 10px; border-radius: 6px; color: var(--ink-muted); }
+  .topbar-right .badge.public { color: var(--ink); font-weight: 500; }
+  .topbar-right .badge.draft {
+    background: #fef3c7; color: #92400e; padding: 4px 10px;
+    border-radius: 999px; font-size: 11px; font-weight: 600;
+  }
+  .btn-soft {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 12px;
+    font-size: 13px; font-weight: 500; color: var(--ink);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-soft:hover { background: var(--hover); }
+  .btn-primary {
+    background: var(--ink); color: white; border: none;
+    border-radius: 6px; padding: 7px 14px;
+    font-size: 13px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary .caret { opacity: 0.6; }
+  .btn-icon {
+    width: 32px; height: 32px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--panel);
+    display: grid; place-items: center; color: var(--ink-muted);
+  }
+  .btn-icon:hover { background: var(--hover); color: var(--ink); }
+  .btn-icon.ghost { border: none; }
+
+  /* ============ APP GRID ============ */
+  .app {
+    display: grid;
+    grid-template-columns: 248px 1fr 380px;
+    height: calc(100vh - 56px);
+  }
+  @media (max-width: 1100px) { .app { grid-template-columns: 1fr; } .leftnav, .inspector { display: none; } }
+
+  /* ============ LEFT NAV ============ */
+  .leftnav {
+    background: var(--panel); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 14px 0; display: flex; flex-direction: column;
+  }
+  .org-switcher {
+    margin: 0 12px 16px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 8px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 500;
+  }
+  .org-switcher .dot-zen {
+    width: 20px; height: 20px; border-radius: 5px;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    color: white; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .org-switcher .caret { margin-left: auto; color: var(--ink-faint); }
+  .back-link {
+    margin: 0 12px 6px; padding: 4px 10px;
+    font-size: 12px; color: var(--ink-muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .agent-card {
+    margin: 0 12px 18px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 8px;
+    display: flex; align-items: center; gap: 10px; background: var(--panel);
+  }
+  .agent-card .avatar { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #fb923c, #ec4899); }
+  .agent-card .name { font-size: 13px; font-weight: 500; }
+  .agent-menu-item:hover { background: var(--hover); }
+  .nav-group { margin-bottom: 16px; }
+  .nav-title {
+    font-size: 11px; font-weight: 500; color: var(--ink-faint);
+    padding: 0 22px; margin-bottom: 4px; letter-spacing: 0.02em;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 16px 7px 22px;
+    font-size: 13px; color: var(--ink); margin: 0 8px;
+    border-radius: 6px; text-decoration: none;
+  }
+  .nav-item:hover { background: var(--hover); }
+  .nav-item.active { background: var(--active); font-weight: 500; }
+  .nav-item svg { color: var(--ink-muted); flex-shrink: 0; }
+  .nav-item.active svg { color: var(--ink); }
+
+  /* ============ CANVAS AREA ============ */
+  .canvas-area { position: relative; overflow: hidden; background: var(--bg); }
+  .canvas-toolbar {
+    position: absolute; top: 16px; left: 16px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 4px;
+    display: flex; align-items: center; gap: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04); z-index: 10;
+  }
+  .tool-btn {
+    width: 32px; height: 32px; border-radius: 6px; border: none;
+    background: transparent; color: var(--ink-muted);
+    display: grid; place-items: center; position: relative;
+  }
+  .tool-btn:hover { background: var(--hover); color: var(--ink); }
+  .tool-btn .green-dot { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; background: #10b981; border-radius: 50%; }
+  .tool-btn.templates { width: auto; padding: 0 12px; gap: 6px; font-size: 13px; font-weight: 500; color: var(--ink); }
+  .tool-sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+
+  .canvas {
+    position: absolute; inset: 0; overflow: auto;
+    background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.05) 1px, transparent 0);
+    background-size: 18px 18px;
+  }
+  .canvas-inner { position: relative; width: 1000px; height: 1700px; margin: 0 auto; }
+
+  /* ============ NODES ============ */
+  .node {
+    position: absolute; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; min-width: 240px; max-width: 270px;
+    box-shadow: var(--node-shadow);
+    cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .node:hover { box-shadow: var(--node-shadow-hover); }
+  .node.selected { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(0,0,0,0.08), var(--node-shadow); }
+  .node.needs-approval {
+    border-color: #fde68a;
+    background: linear-gradient(180deg, #fefce8 0%, white 28px);
+  }
+  .node-approval-icon {
+    position: absolute; top: 10px; right: 10px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #ca8a04; color: white;
+    display: grid; place-items: center;
+    box-shadow: 0 1px 3px rgba(202, 138, 4, 0.3);
+  }
+  .node-approval-icon svg { width: 10px; height: 10px; }
+
+  .node-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+  .node-icon {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--hover); display: grid; place-items: center; color: var(--ink-muted);
+  }
+  .node-desc {
+    margin-top: 6px; font-size: 12px; color: var(--ink-muted); line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .node.pill { min-width: auto; padding: 8px 16px 8px 12px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; }
+  .node.pill .node-head { font-weight: 600; }
+
+  .node-badges { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  .node-badge {
+    font-family: var(--mono); font-size: 9px; font-weight: 500;
+    padding: 2px 6px; border-radius: 4px;
+    background: var(--hover); color: var(--ink-muted);
+    border: 1px solid var(--border);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .node-badge::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #16a34a; }
+  .node-badge.danger { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+  .node-badge.danger::before { background: #d97706; }
+  .node-badge.kb { color: var(--zen); background: var(--zen-bg); border-color: #ddd6fe; }
+  .node-badge.kb::before { background: var(--zen); }
+  .node-badge.approval { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+  .node-badge.approval::before { background: #ca8a04; }
+
+  /* ============ EDGES ============ */
+  .edges-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  /* Edge lines hidden — the pill labels alone carry the visual relationship */
+  .edge-line { fill: none; stroke: transparent; stroke-width: 0; }
+  .edge-hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+  .edge-group.selected .edge-line { stroke: transparent; }
+  .edge-group:hover .edge-line { stroke: transparent; }
+
+  .edge-pill {
+    position: absolute;
+    background: var(--ink); color: white;
+    font-size: 11px; font-weight: 500;
+    padding: 4px 10px 4px 8px; border-radius: 999px;
+    border: 1px solid var(--ink);
+    display: inline-flex; align-items: center; gap: 6px;
+    cursor: pointer; pointer-events: auto;
+    transition: transform 0.15s, box-shadow 0.15s;
+    z-index: 5; white-space: nowrap; max-width: 220px;
+  }
+  .edge-pill:hover { transform: scale(1.04); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .edge-pill.selected { box-shadow: 0 0 0 3px rgba(139,92,246,0.3); }
+  .edge-pill .arr { color: rgba(255,255,255,0.6); font-size: 10px; }
+  .edge-pill .lbl { overflow: hidden; text-overflow: ellipsis; }
+  /* Pills no longer sit on a visible line; halo removed */
+  .edge-pill.on-edge {
+    outline: none;
+  }
+
+  /* ============ INSPECTOR ============ */
+  .inspector {
+    background: var(--panel); border-left: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .insp-inner { padding: 18px 22px; }
+  .insp-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .insp-head .title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 500;
+  }
+  .insp-head .title .arrow-sep { color: var(--ink-faint); margin: 0 2px; }
+  .insp-head .icons { display: flex; gap: 4px; }
+
+  .insp-tabs {
+    display: flex; gap: 16px; border-bottom: 1px solid var(--border);
+    margin-bottom: 18px;
+  }
+  .insp-tab {
+    font-size: 13px; font-weight: 500; padding: 0 0 10px;
+    color: var(--ink-muted); border-bottom: 2px solid transparent;
+    margin-bottom: -1px; cursor: pointer;
+  }
+  .insp-tab:hover { color: var(--ink); }
+  .insp-tab.active { color: var(--ink); border-bottom-color: var(--ink); }
+
+  .insp-section { margin-bottom: 18px; }
+  .insp-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .insp-label {
+    font-size: 13px; font-weight: 500; color: var(--ink);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .insp-label .tip {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--hover); color: var(--ink-muted);
+    display: grid; place-items: center;
+    font-size: 9px; font-weight: 600; cursor: help;
+    position: relative;
+  }
+  .insp-label .tip:hover .tip-bubble { display: block; }
+  .tip-bubble {
+    display: none; position: absolute;
+    bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: white;
+    font-size: 11px; font-weight: 400;
+    padding: 6px 10px; border-radius: 6px;
+    width: 220px; line-height: 1.45;
+    z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .tip-bubble::after {
+    content: ''; position: absolute;
+    top: 100%; left: 50%; transform: translateX(-50%);
+    border: 4px solid transparent; border-top-color: var(--ink);
+  }
+  .insp-meta { font-size: 11px; color: var(--ink-faint); }
+  .insp-meta a { color: var(--ink-muted); text-decoration: underline; text-decoration-style: dotted; }
+
+  .textarea, .input {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 12.5px; line-height: 1.55;
+    color: var(--ink); background: var(--panel);
+    resize: none;
+  }
+  .textarea { min-height: 100px; }
+  .input { padding: 8px 12px; font-size: 13px; }
+  .textarea:focus, .input:focus { outline: none; border-color: var(--ink); }
+  .textarea.lg { min-height: 160px; }
+
+  .select-box {
+    width: 100%; padding: 8px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); font-size: 13px; color: var(--ink);
+    display: flex; align-items: center; gap: 8px;
+    position: relative; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .select-box:hover { border-color: var(--ink); background: var(--hover); }
+  .select-box[onclick]:hover::before {
+    content: 'click to change'; position: absolute; right: 32px; top: 50%;
+    transform: translateY(-50%); font-size: 10px; color: var(--ink-muted); font-family: var(--mono);
+    pointer-events: none;
+  }
+  .select-box::after {
+    content: ''; position: absolute; right: 12px;
+    width: 8px; height: 8px;
+    border-right: 1.5px solid var(--ink-faint);
+    border-bottom: 1.5px solid var(--ink-faint);
+    transform: rotate(45deg); top: 50%; margin-top: -6px;
+  }
+  .select-box .avatar-sm {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: linear-gradient(135deg, #60a5fa, #34d399); flex-shrink: 0;
+  }
+
+  .toggle { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; cursor: pointer; vertical-align: middle; }
+  .toggle input { opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; margin: 0; z-index: 2; }
+  .toggle .track { position: absolute; inset: 0; background: var(--border-strong); border-radius: 999px; transition: background 0.15s; pointer-events: none; z-index: 0; }
+  .toggle .knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: white; border-radius: 50%; transition: left 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.25); pointer-events: none; z-index: 1; }
+  .toggle input:checked + .track { background: var(--ink); }
+  .toggle input:checked + .track + .knob { left: 20px; }
+  .toggle:hover .track { background: var(--ink-faint); }
+  .toggle input:checked:hover + .track { background: var(--ink); }
+  .checkbox { width: 16px; height: 16px; border: 1.5px solid var(--border-strong); border-radius: 4px; cursor: pointer; }
+
+  .helper-text { font-size: 11px; color: var(--ink-muted); margin-top: 6px; line-height: 1.5; }
+  .vars-hint { font-size: 12px; color: var(--ink-faint); padding: 8px 12px 0; }
+  .vars-hint code { font-family: var(--mono); }
+
+  /* Settings page */
+  .settings-wrap {
+    max-width: 760px; margin: 0 auto; padding: 32px 40px;
+  }
+  .settings-h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .settings-sub { font-size: 13px; color: var(--ink-muted); margin-bottom: 28px; }
+  .settings-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; margin-bottom: 16px;
+  }
+  .settings-card-head {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 4px;
+  }
+  .settings-card-head .logo-am {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, #ea580c, #fb923c);
+    color: white; display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 700; font-size: 14px;
+  }
+  .settings-card-title { font-size: 15px; font-weight: 600; }
+  .settings-card-status { font-size: 11px; color: #047857; font-weight: 500; }
+  .settings-card-status::before { content: '● '; }
+  .settings-card-desc { font-size: 13px; color: var(--ink-muted); margin: 12px 0 20px; line-height: 1.55; }
+  .field-grid { display: grid; gap: 14px; }
+  .field-grid .field label {
+    font-size: 12px; font-weight: 500; color: var(--ink);
+    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  }
+
+  .approval-row {
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 10px; align-items: center;
+    padding: 10px 12px; background: white;
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+
+  /* Inbox page */
+  .inbox-wrap { padding: 24px 32px; height: 100%; overflow: auto; }
+  .inbox-shell {
+    background: white; border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    display: grid; grid-template-columns: 220px 340px 1fr; height: calc(100vh - 56px - 48px);
+  }
+  .inbox-sidebar { background: #fafaf9; border-right: 1px solid var(--border); padding: 14px 0; overflow-y: auto; }
+  .inbox-sidebar h4 {
+    font-size: 10px; font-weight: 600; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.04em; padding: 0 16px 6px;
+  }
+  .inbox-folder {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 16px; font-size: 13px; color: var(--ink); cursor: pointer;
+  }
+  .inbox-folder:hover { background: var(--hover); }
+  .inbox-folder.active { background: var(--hover); font-weight: 500; }
+  .inbox-folder .count { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--ink-muted); }
+  .inbox-folder .badge-new {
+    margin-left: auto; background: var(--ink); color: white;
+    font-size: 10px; padding: 1px 6px; border-radius: 999px; font-weight: 600;
+  }
+  .thread-list { border-right: 1px solid var(--border); overflow-y: auto; }
+  .thread-item {
+    padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .thread-item:hover { background: #fafaf9; }
+  .thread-item.active { background: var(--zen-bg); border-left: 3px solid var(--zen); padding-left: 13px; }
+  .thread-from { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .thread-from .name { font-size: 13px; font-weight: 600; }
+  .thread-from .time { font-size: 11px; color: var(--ink-muted); font-family: var(--mono); }
+  .thread-subject { font-size: 12px; color: var(--ink); margin-bottom: 3px; font-weight: 500; }
+  .thread-preview {
+    font-size: 11px; color: var(--ink-muted); line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .thread-tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .thread-tag {
+    font-family: var(--mono); font-size: 9px; padding: 1px 5px;
+    border-radius: 3px; border: 1px solid var(--border); color: var(--ink-muted);
+  }
+  .thread-tag.intent { color: var(--zen); border-color: #ddd6fe; background: var(--zen-bg); }
+  .thread-tag.subagent { color: #0f766e; border-color: #99f6e4; background: #f0fdfa; }
+  .thread-tag.bridge { color: #16a34a; border-color: #86efac; background: #f0fdf4; }
+  .thread-tag.warn { color: #92400e; border-color: #fde68a; background: #fef3c7; }
+  .thread-detail { display: flex; flex-direction: column; }
+  .thread-header { padding: 18px 22px; border-bottom: 1px solid var(--border); }
+  .thread-detail-subject { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .thread-detail-meta { font-size: 11px; color: var(--ink-muted); margin-top: 6px; display: flex; gap: 14px; font-family: var(--mono); }
+  .thread-messages { padding: 18px 22px; overflow-y: auto; flex: 1; }
+  .msg { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px dashed var(--border); }
+  .msg:last-child { border-bottom: none; }
+  .msg-from { font-size: 12px; font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .msg-from .time { color: var(--ink-muted); font-weight: 400; font-family: var(--mono); }
+  .msg-body { font-size: 13px; line-height: 1.55; color: #27272a; }
+  .msg.agent { background: var(--zen-bg); margin: 0 -22px 16px; padding: 12px 22px; border-bottom: none; }
+  .msg.agent .msg-from { color: var(--zen); }
+  .msg-trace {
+    margin-top: 10px; font-family: var(--mono); font-size: 10px;
+    color: var(--ink-muted); background: white;
+    padding: 8px 10px; border-radius: 4px; border: 1px solid var(--border);
+  }
+  .msg-trace .lbl { color: var(--zen); font-weight: 600; }
+  .msg-trace .arr { color: var(--ink-faint); margin: 0 4px; }
+
+  .cache-note {
+    margin-top: 16px; padding: 14px 18px;
+    background: #fefce8; border: 1px solid #fde047;
+    border-radius: 8px; font-size: 12px; color: #713f12; line-height: 1.6;
+  }
+  .cache-note b { color: #422006; }
+
+  .page { display: none; height: 100%; }
+  .page.active { display: block; }
+  .canvas-area.page { display: none; }
+  .canvas-area.page.active { display: block; }
+
+  /* On Inbox / Settings / Agent pages, hide the right inspector and widen the canvas to 2 columns */
+  body[data-page="inbox"] .inspector,
+  body[data-page="settings"] .inspector,
+  body[data-page="agent"] .inspector { display: none; }
+  body[data-page="inbox"] .app,
+  body[data-page="settings"] .app,
+  body[data-page="agent"] .app { grid-template-columns: 248px 1fr; }
+
+  .ic-svg { width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+
+<!-- ============ TOP BAR ============ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="logo">Z</span>
+    <span>Zenlabs</span>
+  </div>
+
+  <div class="topbar-crumb">
+    <div class="ic">
+      <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+    </div>
+    <span id="topbar-agent-name">jill-diy — Hiring Pipeline Agent</span>
+    <span class="sep">/</span>
+    <span>Main</span>
+    <span class="branch-pill">Live 100%</span>
+    <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--ink-faint);"><path d="M6 9l6 6 6-6"/></svg>
+  </div>
+
+  <div class="topbar-right">
+    <span class="badge public">Public</span>
+    <span class="badge draft">Draft</span>
+    <button class="btn-soft"><span style="color:var(--ink-muted); font-family:var(--mono);">{ }</span> Variables</button>
+    <button class="btn-soft">Preview</button>
+    <button class="btn-primary">Publish <span class="caret">▾</span></button>
+    <button class="btn-icon ghost"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="btn-icon ghost"><svg class="ic-svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div class="app">
+
+  <!-- LEFT NAV -->
+  <aside class="leftnav">
+    <div class="org-switcher">
+      <span class="dot-zen">Z</span>
+      <span>ZenAgents</span>
+      <svg class="ic-svg caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 9l4 4 4-4M8 15l4-4 4 4"/></svg>
+    </div>
+
+    <div class="back-link">
+      <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      Back to workspace
+    </div>
+
+    <div class="agent-card" id="agent-switcher" onclick="toggleAgentMenu(event)" style="cursor:pointer; position:relative;">
+      <span class="avatar" id="agent-avatar" style="background:linear-gradient(135deg, #8b5cf6, #ec4899);"></span>
+      <span class="name" id="agent-name">jill-diy</span>
+      <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto; color:var(--ink-faint);"><path d="M8 9l4 4 4-4M8 15l4-4 4 4"/></svg>
+      <div id="agent-menu" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:var(--panel); border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.08); z-index:200; padding:4px;">
+        <div class="agent-menu-item" onclick="switchAgent('jill', event)" style="padding:8px 10px; border-radius:6px; display:flex; align-items:center; gap:10px; font-size:13px;">
+          <span class="avatar" style="width:22px; height:22px; border-radius:50%; background:linear-gradient(135deg, #8b5cf6, #ec4899);"></span>
+          <div style="flex:1;">
+            <div style="font-weight:500;">jill-diy</div>
+            <div style="font-size:11px; color:var(--ink-muted);">Hiring pipeline · email-only</div>
+          </div>
+          <svg class="ic-svg agent-check" data-agent="jill" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--ink);"><path d="M5 12l5 5L20 7"/></svg>
+        </div>
+        <div class="agent-menu-item" style="padding:8px 10px; border-radius:6px; display:flex; align-items:center; gap:10px; font-size:13px; opacity:0.55; cursor:not-allowed;">
+          <span class="avatar" style="width:22px; height:22px; border-radius:50%; background:linear-gradient(135deg, #fb923c, #ec4899);"></span>
+          <div style="flex:1;">
+            <div style="font-weight:500;">jack-diy</div>
+            <div style="font-size:11px; color:var(--ink-muted);">Candidate sourcing · ~1 month out</div>
+          </div>
+          <span style="font-family:var(--mono); font-size:9px; padding:2px 6px; border-radius:4px; background:var(--hover); color:var(--ink-muted); border:1px solid var(--border);">soon</span>
+        </div>
+        <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+        <div style="padding:8px 10px; font-size:12px; color:var(--ink-muted); display:flex; align-items:center; gap:8px; cursor:pointer; border-radius:6px;" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='transparent'">
+          <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          New agent
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-title">Configure</div>
+      <a class="nav-item" onclick="showPage('agent', this)">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4 4-7 8-7s8 3 8 7"/></svg>
+        Agent
+      </a>
+      <a class="nav-item active" onclick="showPage('workflow', this)">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7"/></svg>
+        Workflow
+      </a>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12M6 21a3 3 0 100-6 3 3 0 000 6zM18 6a3 3 0 100-6 3 3 0 000 6zM6 9c0 5 6 5 6 10"/></svg>
+        Branches
+      </a>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14l-4-2-4 2-4-2-4 2z"/></svg>
+        Knowledge Base
+      </a>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></svg>
+        Analysis
+      </a>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4 4 0 105.6 5.6L21 11l-8 8-4 1 1-4 8-8 .7.3z"/></svg>
+        Tools
+      </a>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+        Widget
+      </a>
+      <a class="nav-item" onclick="showPage('settings', this)">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 01-.6 2.8l2 1.5-2 3.4-2.4-1a7 7 0 01-2.4 1.4L13 22h-2l-.6-2a7 7 0 01-2.4-1.3l-2.4 1-2-3.5 2-1.5A7 7 0 015 12c0-1 .2-1.9.5-2.8l-2-1.5 2-3.4 2.4 1A7 7 0 0110 4l.6-2H13l.6 2a7 7 0 012.4 1.3l2.4-1 2 3.5-2 1.5c.3.9.5 1.8.6 2.7z"/></svg>
+        Settings
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-title">Monitor</div>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        Dashboards
+      </a>
+      <a class="nav-item" onclick="showPage('inbox', this)">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2M5 7l3-3h8l3 3v13a2 2 0 01-2 2H7a2 2 0 01-2-2V7z"/></svg>
+        Inbox
+      </a>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.4 8.4 0 01-3.6-.8L3 21l1.9-5a8.5 8.5 0 1116.1-4.5z"/></svg>
+        Conversations
+      </a>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Tests
+      </a>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M3 22c0-3.3 2.7-6 6-6s6 2.7 6 6M17 11h6M20 8v6"/></svg>
+        Users
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-title">Deploy</div>
+      <a class="nav-item">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+        Outbound
+      </a>
+    </div>
+
+    <div class="nav-item" style="margin-top:auto;">
+      <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+      Developers
+    </div>
+  </aside>
+
+  <!-- WORKFLOW PAGE -->
+  <main class="canvas-area page active" id="page-workflow">
+    <div class="canvas-toolbar">
+      <button class="tool-btn" title="Zoom in"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg></button>
+      <button class="tool-btn" title="Zoom out"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6"/></svg></button>
+      <button class="tool-btn" title="Fit"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg></button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" title="Group"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg></button>
+      <button class="tool-btn" title="Refresh"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5"/></svg><span class="green-dot"></span></button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn templates">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Templates
+      </button>
+    </div>
+
+    <div class="canvas">
+      <div class="canvas-inner agent-canvas" data-agent="jack" style="display:none;">
+
+        <svg class="edges-svg" viewBox="0 0 1000 1200" preserveAspectRatio="none">
+          <g class="edge-group" id="edge-start"><path class="edge-hit" d="M 500 90 L 500 170"/><path class="edge-line" d="M 500 90 L 500 170"/></g>
+          <g class="edge-group" data-edge="route_intake" onclick="selectEdge('route_intake', 'Orchestrator', 'Jack-Intake')"><path class="edge-hit" d="M 425 320 Q 200 400 130 500"/><path class="edge-line" d="M 425 320 Q 200 400 130 500"/></g>
+          <g class="edge-group" data-edge="route_status" onclick="selectEdge('route_status', 'Orchestrator', 'Jack-Updater')"><path class="edge-hit" d="M 455 320 Q 320 400 310 500"/><path class="edge-line" d="M 455 320 Q 320 400 310 500"/></g>
+          <g class="edge-group" data-edge="route_coach" onclick="selectEdge('route_coach', 'Orchestrator', 'Jack-Coach')"><path class="edge-hit" d="M 500 320 L 500 500"/><path class="edge-line" d="M 500 320 L 500 500"/></g>
+          <g class="edge-group" data-edge="route_schedule" onclick="selectEdge('route_schedule', 'Orchestrator', 'Jack-Scheduler')"><path class="edge-hit" d="M 545 320 Q 680 400 690 500"/><path class="edge-line" d="M 545 320 Q 680 400 690 500"/></g>
+          <g class="edge-group" data-edge="route_negotiate" onclick="selectEdge('route_negotiate', 'Orchestrator', 'Jack-Negotiator')"><path class="edge-hit" d="M 575 320 Q 800 400 870 500"/><path class="edge-line" d="M 575 320 Q 800 400 870 500"/></g>
+          <g class="edge-group"><path class="edge-hit" d="M 130 650 Q 280 740 480 870"/><path class="edge-line" d="M 130 650 Q 280 740 480 870"/></g>
+          <g class="edge-group"><path class="edge-hit" d="M 310 650 Q 380 740 490 870"/><path class="edge-line" d="M 310 650 Q 380 740 490 870"/></g>
+          <g class="edge-group"><path class="edge-hit" d="M 500 650 L 500 870"/><path class="edge-line" d="M 500 650 L 500 870"/></g>
+          <g class="edge-group"><path class="edge-hit" d="M 690 650 Q 620 740 510 870"/><path class="edge-line" d="M 690 650 Q 620 740 510 870"/></g>
+          <g class="edge-group"><path class="edge-hit" d="M 870 650 Q 700 740 520 870"/><path class="edge-line" d="M 870 650 Q 700 740 520 870"/></g>
+        </svg>
+
+        <div class="edge-pill" data-pill="webhook" style="top:122px; left:430px;" onclick="selectEdge('webhook', 'Start', 'Orchestrator')">
+          <span class="arr">↳</span> <span class="lbl">New email received</span>
+        </div>
+
+        <div class="edge-pill" data-pill="route_intake" style="top:402px; left:60px;" onclick="selectEdge('route_intake', 'Orchestrator', 'Jack-Intake')">
+          <span class="arr">↳</span> <span class="lbl">New candidate or resume</span>
+        </div>
+        <div class="edge-pill" data-pill="route_status" style="top:402px; left:240px;" onclick="selectEdge('route_status', 'Orchestrator', 'Jack-Updater')">
+          <span class="arr">↳</span> <span class="lbl">Asking about status</span>
+        </div>
+        <div class="edge-pill" data-pill="route_coach" style="top:402px; left:430px;" onclick="selectEdge('route_coach', 'Orchestrator', 'Jack-Coach')">
+          <span class="arr">↳</span> <span class="lbl">Interview prep</span>
+        </div>
+        <div class="edge-pill" data-pill="route_schedule" style="top:402px; left:610px;" onclick="selectEdge('route_schedule', 'Orchestrator', 'Jack-Scheduler')">
+          <span class="arr">↳</span> <span class="lbl">Scheduling</span>
+        </div>
+        <div class="edge-pill" data-pill="route_negotiate" style="top:402px; left:800px;" onclick="selectEdge('route_negotiate', 'Orchestrator', 'Jack-Negotiator')">
+          <span class="arr">↳</span> <span class="lbl">Offer or negotiation</span>
+        </div>
+
+        <!-- Nodes -->
+        <div class="node pill" style="top:40px; left:455px;" onclick="selectNode('start')">
+          <div class="node-head"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 22V4l14 8-14 10z"/></svg> Start</div>
+        </div>
+
+        <div class="node selected" id="node-orchestrator" style="top:180px; left:380px;" onclick="selectNode('orchestrator')">
+          <div class="node-head">
+            <span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c0-3 3-5 7-5s7 2 7 5"/></svg></span>
+            Orchestrator
+          </div>
+          <div class="node-desc">Fetch full thread from cache. Classify intent. Call exactly one routing tool below — never write a reply directly.</div>
+        </div>
+
+        <div class="node" id="node-intake" style="top:510px; left:10px;" onclick="selectNode('intake')">
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c0-3 3-5 7-5s7 2 7 5"/></svg></span> Jack-Intake</div>
+          <div class="node-desc">Parse resume, build candidate profile, ask any missing onboarding questions.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge">auto-send</span></div>
+        </div>
+        <div class="node" id="node-updater" style="top:510px; left:200px;" onclick="selectNode('updater')">
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c0-3 3-5 7-5s7 2 7 5"/></svg></span> Jack-Updater</div>
+          <div class="node-desc">Read application stage from ATS, summarize truthfully — never invent progress.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge">auto-send</span></div>
+        </div>
+        <div class="node" id="node-coach" style="top:510px; left:390px;" onclick="selectNode('coach')">
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c0-3 3-5 7-5s7 2 7 5"/></svg></span> Jack-Coach</div>
+          <div class="node-desc">Interview prep, resume tweaks, practice questions, behavioural coaching.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge">auto-send</span></div>
+        </div>
+        <div class="node" id="node-scheduler" style="top:510px; left:580px;" onclick="selectNode('scheduler')">
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c0-3 3-5 7-5s7 2 7 5"/></svg></span> Jack-Scheduler</div>
+          <div class="node-desc">Propose slots in candidate's timezone, confirm interview times via calendar.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge">auto-send</span></div>
+        </div>
+        <div class="node" id="node-negotiator" style="top:510px; left:770px;" onclick="selectNode('negotiator')">
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c0-3 3-5 7-5s7 2 7 5"/></svg></span> Jack-Negotiator</div>
+          <div class="node-desc">Offer review, comp / equity questions, draft counter-offers.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge danger">human approval</span></div>
+        </div>
+
+        <div class="node pill" style="top:900px; left:460px;" onclick="selectNode('end')">
+          <div class="node-head"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L2 22M22 22L2 2"/></svg> End</div>
+        </div>
+
+      </div>
+
+      <!-- JILL CANVAS -->
+      <div class="canvas-inner agent-canvas" data-agent="jill" style="display:none;">
+
+        <!-- Staged approval banner -->
+        <div style="position:absolute; top:16px; left:24px; right:24px; max-width:540px; margin:0 auto; padding:10px 14px; background:#fefce8; border:1px solid #fde047; border-radius:8px; display:flex; align-items:center; gap:10px; font-size:12px; color:#713f12; z-index:5;">
+          <div style="width:22px; height:22px; border-radius:50%; background:#ca8a04; display:grid; place-items:center; flex-shrink:0;">
+            <svg style="width:13px; height:13px; color:white;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+          </div>
+          <div style="flex:1; line-height:1.4;">
+            <b style="color:#422006;">5 of 6 subagents need your approval</b> before sending. Status-Reporter sends directly (read-only summaries to you).
+          </div>
+          <a onclick="document.querySelector('.nav-item[onclick*=settings]').click()" style="color:#a16207; text-decoration:underline; cursor:pointer; font-weight:500; white-space:nowrap;">Manage →</a>
+        </div>
+
+        <!--
+          Layout strategy:
+          - Orchestrator centered at (380, 180) — 290px wide
+          - 6 subagents in a 3x2 grid, each 240px wide
+          - Edge pills sit ON the line by splitting path into segments meeting at pill center
+        -->
+
+        <svg class="edges-svg" viewBox="0 0 1000 1100" preserveAspectRatio="none">
+          <!-- Start → Orchestrator -->
+          <g class="edge-group">
+            <path class="edge-hit" d="M 500 90 L 500 170"/>
+            <path class="edge-line" d="M 500 90 L 500 170"/>
+          </g>
+
+          <!-- Orchestrator → 6 stage subagents (top row: 3, bottom row: 3) -->
+          <!-- Pills will sit at ~y=410 (top row) and ~y=720 (bottom row), centered on each path -->
+
+          <g class="edge-group" data-edge="jill_route_intro" onclick="selectEdge('jill_route_intro', 'Orchestrator', 'Intro-Setter')">
+            <path class="edge-hit" d="M 410 320 Q 200 380 130 500"/>
+            <path class="edge-line" d="M 410 320 Q 200 380 130 500"/>
+          </g>
+          <g class="edge-group" data-edge="jill_route_takehome" onclick="selectEdge('jill_route_takehome', 'Orchestrator', 'TakeHome-Sender')">
+            <path class="edge-hit" d="M 470 320 Q 410 400 400 500"/>
+            <path class="edge-line" d="M 470 320 Q 410 400 400 500"/>
+          </g>
+          <g class="edge-group" data-edge="jill_route_codereview" onclick="selectEdge('jill_route_codereview', 'Orchestrator', 'CodeReview-Scheduler')">
+            <path class="edge-hit" d="M 530 320 Q 600 400 670 500"/>
+            <path class="edge-line" d="M 530 320 Q 600 400 670 500"/>
+          </g>
+          <g class="edge-group" data-edge="jill_route_pmreview" onclick="selectEdge('jill_route_pmreview', 'Orchestrator', 'PMReview-Scheduler')">
+            <path class="edge-hit" d="M 590 320 Q 800 400 880 500"/>
+            <path class="edge-line" d="M 590 320 Q 800 400 880 500"/>
+          </g>
+
+          <!-- Bottom row: Status-Reporter and Handoff via wider arc -->
+          <g class="edge-group" data-edge="jill_route_status" onclick="selectEdge('jill_route_status', 'Orchestrator', 'Status-Reporter')">
+            <path class="edge-hit" d="M 430 320 Q 180 550 130 800"/>
+            <path class="edge-line" d="M 430 320 Q 180 550 130 800"/>
+          </g>
+          <g class="edge-group" data-edge="jill_route_handoff" onclick="selectEdge('jill_route_handoff', 'Orchestrator', 'Handoff')">
+            <path class="edge-hit" d="M 570 320 Q 820 550 880 800"/>
+            <path class="edge-line" d="M 570 320 Q 820 550 880 800"/>
+          </g>
+        </svg>
+
+        <!-- Edge pills positioned on the midpoint of each path so the line passes through them -->
+        <!-- For visual alignment the pill sits centered over the path's midpoint -->
+
+        <div class="edge-pill on-edge" data-pill="jill_webhook" style="top:122px; left:418px;" onclick="selectEdge('jill_webhook', 'Start', 'Orchestrator')">
+          <span class="arr">↳</span> <span class="lbl">New email received</span>
+        </div>
+
+        <!-- Top row pills sit at the path midpoints, around y=395 -->
+        <div class="edge-pill on-edge" data-pill="jill_route_intro" style="top:475px; left:140px;" onclick="selectEdge('jill_route_intro', 'Orchestrator', 'Intro-Setter')">
+          <span class="arr">↳</span> <span class="lbl">Intro candidates</span>
+        </div>
+        <div class="edge-pill on-edge" data-pill="jill_route_takehome" style="top:475px; left:325px;" onclick="selectEdge('jill_route_takehome', 'Orchestrator', 'TakeHome-Sender')">
+          <span class="arr">↳</span> <span class="lbl">Send take-home</span>
+        </div>
+        <div class="edge-pill on-edge" data-pill="jill_route_codereview" style="top:475px; left:540px;" onclick="selectEdge('jill_route_codereview', 'Orchestrator', 'CodeReview-Scheduler')">
+          <span class="arr">↳</span> <span class="lbl">Schedule code review</span>
+        </div>
+        <div class="edge-pill on-edge" data-pill="jill_route_pmreview" style="top:475px; left:745px;" onclick="selectEdge('jill_route_pmreview', 'Orchestrator', 'PMReview-Scheduler')">
+          <span class="arr">↳</span> <span class="lbl">Schedule PM review</span>
+        </div>
+
+        <!-- Bottom row pills further down to sit on those longer arcs -->
+        <div class="edge-pill on-edge" data-pill="jill_route_status" style="top:745px; left:110px;" onclick="selectEdge('jill_route_status', 'Orchestrator', 'Status-Reporter')">
+          <span class="arr">↳</span> <span class="lbl">Where are we with X?</span>
+        </div>
+        <div class="edge-pill on-edge" data-pill="jill_route_handoff" style="top:745px; left:760px;" onclick="selectEdge('jill_route_handoff', 'Orchestrator', 'Handoff')">
+          <span class="arr">↳</span> <span class="lbl">HM takes over</span>
+        </div>
+
+        <!-- Start -->
+        <div class="node pill" style="top:40px; left:455px;" onclick="selectNode('start')">
+          <div class="node-head"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 22V4l14 8-14 10z"/></svg> Start</div>
+        </div>
+
+        <!-- Orchestrator -->
+        <div class="node selected" id="node-jill-orchestrator" style="top:180px; left:380px;" onclick="selectNode('jill_orchestrator')">
+          <div class="node-head">
+            <span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c0-3 3-5 7-5s7 2 7 5"/></svg></span>
+            Orchestrator
+          </div>
+          <div class="node-desc">Reads the email thread + HM's latest reply. No external state — the thread IS the state. Picks one stage subagent.</div>
+        </div>
+
+        <!-- Top row of subagents (4) — pipeline stages -->
+        <div class="node needs-approval" id="node-jill-intro" style="top:510px; left:10px;" onclick="selectNode('jill_intro')">
+          <div class="node-approval-icon" title="Needs your approval before sending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></div>
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.4 8.4 0 01-3.6-.8L3 21l1.9-5a8.5 8.5 0 1116.1-4.5z"/></svg></span> Intro-Setter</div>
+          <div class="node-desc">HM picked candidates from the shortlist. Open a fresh thread per candidate with HM + candidate + jill-diy on the To/Cc.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge approval">needs approval</span></div>
+        </div>
+        <div class="node needs-approval" id="node-jill-takehome" style="top:510px; left:280px;" onclick="selectNode('jill_takehome')">
+          <div class="node-approval-icon" title="Needs your approval before sending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></div>
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span> TakeHome-Sender</div>
+          <div class="node-desc">HM said "send Foo take-home to X". Pulls take-home from KB, attaches it, includes HM's WhatsApp for queries.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge approval">needs approval</span><span class="node-badge kb">3 KB</span></div>
+        </div>
+        <div class="node needs-approval" id="node-jill-codereview" style="top:510px; left:550px;" onclick="selectNode('jill_codereview')">
+          <div class="node-approval-icon" title="Needs your approval before sending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></div>
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></span> CodeReview-Scheduler</div>
+          <div class="node-desc">HM said "have Devon code-review X's submission". Loop in Devon, share GitHub link, propose times.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge approval">needs approval</span></div>
+        </div>
+        <div class="node needs-approval" id="node-jill-pmreview" style="top:510px; left:820px;" onclick="selectNode('jill_pmreview')">
+          <div class="node-approval-icon" title="Needs your approval before sending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></div>
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span> PMReview-Scheduler</div>
+          <div class="node-desc">HM said "loop in Mira for PM round with X". Coordinate the PM round, share context from previous rounds.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge approval">needs approval</span></div>
+        </div>
+
+        <!-- Bottom row: utility subagents -->
+        <div class="node" id="node-jill-status" style="top:790px; left:10px;" onclick="selectNode('jill_status')">
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span> Status-Reporter</div>
+          <div class="node-desc">HM asked "where are we with Priya?" or "what's pending?". Reads cached threads, summarizes faithfully.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge">auto-send</span></div>
+        </div>
+        <div class="node needs-approval" id="node-jill-handoff" style="top:790px; left:820px;" onclick="selectNode('jill_handoff')">
+          <div class="node-approval-icon" title="Needs your approval before sending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></div>
+          <div class="node-head"><span class="node-icon"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 17l5-5-5-5M21 12H9M4 5v14"/></svg></span> Handoff</div>
+          <div class="node-desc">HM said "I'll take it from here". jill-diy posts a brief recap, removes itself from the To/Cc, archives the thread.</div>
+          <div class="node-badges"><span class="node-badge">guarded</span><span class="node-badge approval">needs approval</span></div>
+        </div>
+
+        <!-- No End node — workflow terminates implicitly when Send completes -->
+
+      </div>
+    </div>
+  </main>
+
+  <!-- SETTINGS PAGE -->
+  <main class="canvas-area page" id="page-settings" style="overflow:auto;">
+    <div class="settings-wrap">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h1 class="settings-h1">Settings</h1>
+          <div class="settings-sub">Integrations and operational configuration for this agent.</div>
+        </div>
+        <div id="save-indicator" style="display:none; align-items:center; gap:6px; font-size:12px; color:#16a34a; background:#ecfdf5; border:1px solid #bbf7d0; padding:6px 12px; border-radius:999px;">
+          <svg style="width:13px; height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+          <span>Saved</span>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-head">
+          <div class="logo-am">AM</div>
+          <div>
+            <div class="settings-card-title">AgentMail</div>
+            <div class="settings-card-status">Connected · jill-hm@diy.ai</div>
+          </div>
+          <div style="margin-left:auto; display:flex; gap:8px;">
+            <button class="btn-soft">Test connection</button>
+            <button class="btn-soft">Disconnect</button>
+          </div>
+        </div>
+        <div class="settings-card-desc">Inbound emails to this address (and Ccs to multi-party threads) trigger the orchestrator. Outbound replies are sent through this inbox. The cache is updated on every webhook and reconciled every 60s as a safety net. jill-diy is stateless across threads — the email thread itself is the only context.</div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label>Inbox address
+              <span class="tip">?<span class="tip-bubble">The agent's email identity, provisioned in your AgentMail account. HM Cc's this address on candidate threads to bring jill-diy in.</span></span>
+            </label>
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; position:relative;">
+                <div class="select-box" onclick="toggleInboxDropdown(event)" id="inbox-select">
+                  <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--c-inbox);"><path d="M22 12h-6l-2 3h-4l-2-3H2M5 7l3-3h8l3 3v13a2 2 0 01-2 2H7a2 2 0 01-2-2V7z"/></svg>
+                  <span id="inbox-selected-label">jill-hm@diy.ai</span>
+                </div>
+                <div id="inbox-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:var(--panel); border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.08); z-index:50; padding:4px; max-height:240px; overflow-y:auto;">
+                  <div class="inbox-option" data-addr="jill-hm@diy.ai" onclick="selectInbox(event, 'jill-hm@diy.ai')">
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px;">
+                      <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--c-inbox);"><path d="M22 12h-6l-2 3h-4l-2-3H2M5 7l3-3h8l3 3v13a2 2 0 01-2 2H7a2 2 0 01-2-2V7z"/></svg>
+                      <div style="flex:1;">
+                        <div style="font-size:13px; font-weight:500;">jill-hm@diy.ai</div>
+                        <div style="font-size:11px; color:var(--ink-muted);">Active · 38 threads · created Jan 14</div>
+                      </div>
+                      <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--ink);"><path d="M5 12l5 5L20 7"/></svg>
+                    </div>
+                  </div>
+                  <div class="inbox-option" data-addr="jill-test@diy.ai" onclick="selectInbox(event, 'jill-test@diy.ai')">
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px;">
+                      <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--ink-muted);"><path d="M22 12h-6l-2 3h-4l-2-3H2M5 7l3-3h8l3 3v13a2 2 0 01-2 2H7a2 2 0 01-2-2V7z"/></svg>
+                      <div style="flex:1;">
+                        <div style="font-size:13px; font-weight:500;">jill-test@diy.ai</div>
+                        <div style="font-size:11px; color:var(--ink-muted);">Sandbox · 4 threads · created Feb 2</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+                  <div onclick="openCreateInbox(event)" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; cursor:pointer; color:var(--zen); font-size:13px; font-weight:500;" onmouseover="this.style.background='var(--zen-bg)'" onmouseout="this.style.background='transparent'">
+                    <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                    Create new inbox
+                  </div>
+                  <div onclick="refreshInboxes(event)" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; cursor:pointer; color:var(--ink-muted); font-size:12px;" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='transparent'">
+                    <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5"/></svg>
+                    Refresh from AgentMail
+                  </div>
+                </div>
+              </div>
+              <button class="btn-soft" onclick="openCreateInbox(event)" style="white-space:nowrap;">
+                <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                New inbox
+              </button>
+            </div>
+            <div class="helper-text">Inboxes are provisioned in AgentMail. Pick an existing one or create a new inbox below.</div>
+          </div>
+          <div class="field">
+            <label>API key
+              <span class="tip">?<span class="tip-bubble">Your AgentMail API key. Used to send replies and pull thread state. Stored encrypted.</span></span>
+            </label>
+            <input class="input" type="password" value="••••••••••••••••sk_live_8a2f" />
+          </div>
+          <div class="field">
+            <label>Webhook URL
+              <span class="tip">?<span class="tip-bubble">Where AgentMail sends inbound message events. Copy this into your AgentMail dashboard.</span></span>
+            </label>
+            <input class="input" value="https://api.zenlabs.ai/webhooks/agentmail/jill-diy" readonly />
+          </div>
+          <div class="field">
+            <label>Webhook signing secret
+              <span class="tip">?<span class="tip-bubble">Verifies that incoming webhooks really came from AgentMail. Rotate if compromised.</span></span>
+            </label>
+            <input class="input" type="password" value="••••••••••••whsec_4f29c" />
+          </div>
+          <div class="field">
+            <label>Sender display name
+              <span class="tip">?<span class="tip-bubble">The "From" name candidates and HMs see in their inbox.</span></span>
+            </label>
+            <input class="input" value="jill-diy (hiring assistant)" />
+          </div>
+          <div class="field">
+            <label>Reply signature
+              <span class="tip">?<span class="tip-bubble">Appended to every outbound email.</span></span>
+            </label>
+            <textarea class="textarea" style="min-height:70px;">— jill-diy on behalf of {{hm_name}}
+Cc'd: {{hm_email}} · Reply-all to keep me in the loop.</textarea>
+          </div>
+          <div class="field">
+            <label>Reconciler interval
+              <span class="tip">?<span class="tip-bubble">How often we poll AgentMail for messages we may have missed (e.g. webhook downtime).</span></span>
+            </label>
+            <div class="select-box" onclick="cycleOption(this, ['Every 30 seconds', 'Every 60 seconds', 'Every 2 minutes', 'Every 5 minutes', 'Every 15 minutes'])"><span>Every 60 seconds</span></div>
+          </div>
+          <div class="field">
+            <label>Cache TTL
+              <span class="tip">?<span class="tip-bubble">How long thread data is kept in our Postgres cache before refreshing from AgentMail.</span></span>
+            </label>
+            <div class="select-box" onclick="cycleOption(this, ['1 hour (active) · 24 hours (closed)', '24 hours (active) · 7 days (closed)', '7 days (active) · 30 days (closed)', 'No expiry'])"><span>24 hours (active) · 7 days (closed)</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card" style="border-color:#fde047; background:linear-gradient(180deg, #fefce8 0%, white 60px);">
+        <div class="settings-card-head">
+          <div class="logo-am" style="background:linear-gradient(135deg, #ca8a04, #eab308);">
+            <svg style="width:18px; height:18px;" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+          </div>
+          <div>
+            <div class="settings-card-title">Approval before sending</div>
+            <div class="settings-card-status" style="color:#a16207;" id="staged-status-text">● 5 of 6 subagents need your approval before sending</div>
+          </div>
+        </div>
+        <div class="settings-card-desc">
+          For each subagent, choose whether jill-diy sends emails itself or waits for you to approve in the Inbox. <b>Tip:</b> start with everything needing approval and relax as you build confidence — usually over the first few weeks.
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;" id="approval-rows-container">
+          <div class="approval-row" data-sub="Intro-Setter">
+            <div>
+              <div style="font-size:13px; font-weight:500;">Intro-Setter</div>
+              <div style="font-size:11px; color:var(--ink-muted);">opens new threads with candidates</div>
+            </div>
+            <div style="text-align:right;"><label class="toggle"><input type="checkbox" checked onchange="onApprovalChange(this)"><span class="track"></span><span class="knob"></span></label></div>
+          </div>
+
+          <div class="approval-row" data-sub="TakeHome-Sender">
+            <div>
+              <div style="font-size:13px; font-weight:500;">TakeHome-Sender</div>
+              <div style="font-size:11px; color:var(--ink-muted);">attaches take-home material</div>
+            </div>
+            <div style="text-align:right;"><label class="toggle"><input type="checkbox" checked onchange="onApprovalChange(this)"><span class="track"></span><span class="knob"></span></label></div>
+          </div>
+
+          <div class="approval-row" data-sub="CodeReview-Scheduler">
+            <div>
+              <div style="font-size:13px; font-weight:500;">CodeReview-Scheduler</div>
+              <div style="font-size:11px; color:var(--ink-muted);">loops in colleagues for code review</div>
+            </div>
+            <div style="text-align:right;"><label class="toggle"><input type="checkbox" checked onchange="onApprovalChange(this)"><span class="track"></span><span class="knob"></span></label></div>
+          </div>
+
+          <div class="approval-row" data-sub="PMReview-Scheduler">
+            <div>
+              <div style="font-size:13px; font-weight:500;">PMReview-Scheduler</div>
+              <div style="font-size:11px; color:var(--ink-muted);">loops in PMs for product round</div>
+            </div>
+            <div style="text-align:right;"><label class="toggle"><input type="checkbox" checked onchange="onApprovalChange(this)"><span class="track"></span><span class="knob"></span></label></div>
+          </div>
+
+          <div class="approval-row" data-sub="Status-Reporter">
+            <div>
+              <div style="font-size:13px; font-weight:500;">Status-Reporter</div>
+              <div style="font-size:11px; color:var(--ink-muted);">read-only summaries — only ever replies to you</div>
+            </div>
+            <div style="text-align:right;"><label class="toggle"><input type="checkbox" onchange="onApprovalChange(this)"><span class="track"></span><span class="knob"></span></label></div>
+          </div>
+
+          <div class="approval-row" data-sub="Handoff">
+            <div>
+              <div style="font-size:13px; font-weight:500;">Handoff</div>
+              <div style="font-size:11px; color:var(--ink-muted);">brief recap, then exits the thread</div>
+            </div>
+            <div style="text-align:right;"><label class="toggle"><input type="checkbox" checked onchange="onApprovalChange(this)"><span class="track"></span><span class="knob"></span></label></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-head">
+          <div class="logo-am" style="background:linear-gradient(135deg, #db2777, #ec4899);">G</div>
+          <div>
+            <div class="settings-card-title">Guardrails</div>
+            <div class="settings-card-status">Pre-draft checks · applies to every subagent</div>
+          </div>
+        </div>
+        <div class="settings-card-desc">Every draft passes through Guardian before it's queued for approval (or sent, once a subagent is off staged approval).</div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label>Guardian model
+              <span class="tip">?<span class="tip-bubble">The model that reviews every draft. Haiku is fast and cheap and works well for policy checks.</span></span>
+            </label>
+            <div class="select-box" onclick="cycleOption(this, ['Claude Haiku 4.5', 'Claude Sonnet 4', 'Claude Opus 4.7', 'GPT-5'])"><span>Claude Haiku 4.5</span></div>
+          </div>
+          <div class="field">
+            <label>Default checks
+              <span class="tip">?<span class="tip-bubble">Which checks run on every draft.</span></span>
+            </label>
+            <div style="display:flex; flex-direction:column; gap:8px; padding:10px 12px; border:1px solid var(--border); border-radius:8px;">
+              <label style="display:flex; align-items:center; gap:10px; font-size:13px;"><input type="checkbox" checked> PII scan</label>
+              <label style="display:flex; align-items:center; gap:10px; font-size:13px;"><input type="checkbox" checked> Factual claims must cite KB or thread</label>
+              <label style="display:flex; align-items:center; gap:10px; font-size:13px;"><input type="checkbox" checked> Tone &amp; brand voice</label>
+              <label style="display:flex; align-items:center; gap:10px; font-size:13px;"><input type="checkbox"> Profanity filter</label>
+            </div>
+          </div>
+          <div class="field">
+            <label>Reply idempotency window
+              <span class="tip">?<span class="tip-bubble">If the same thread+turn produces multiple drafts (retries, races), only send once within this window.</span></span>
+            </label>
+            <div class="select-box"><span>5 minutes</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- AGENT PAGE -->
+  <main class="canvas-area page" id="page-agent">
+    <div class="settings-wrap">
+      <h1 class="settings-h1">Agent</h1>
+      <div class="settings-sub">Top-level identity and defaults for Jack.</div>
+      <div class="settings-card">
+        <div class="settings-card-title" style="margin-bottom:14px;">Identity</div>
+        <div class="field-grid">
+          <div class="field"><label>Name</label><input class="input" value="Jack — Email Agent (Candidate)"/></div>
+          <div class="field"><label>Default LLM</label><div class="select-box"><span>Claude Sonnet 4</span></div></div>
+          <div class="field"><label>Default voice</label><div class="select-box"><span class="avatar-sm"></span><span>Hans Wilmar</span></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- CACHED INBOX PAGE -->
+  <main class="canvas-area page" id="page-inbox">
+    <div class="inbox-wrap">
+      <div style="margin-bottom:16px;">
+        <h1 class="settings-h1" style="margin:0;">Inbox</h1>
+        <div class="settings-sub" style="margin:4px 0 0;">Every thread jill-diy is part of, plus drafts awaiting your approval.</div>
+      </div>
+
+      <div class="inbox-shell">
+        <div class="inbox-sidebar" id="inbox-folders">
+          <!-- populated by JS -->
+        </div>
+
+        <div class="thread-list" id="thread-list-content">
+          <!-- populated by JS -->
+        </div>
+
+        <div class="thread-detail" id="thread-detail-content">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <div class="cache-note">
+        <b>5 subagents currently need your approval</b> before sending — drafts from Intro-Setter, TakeHome-Sender, CodeReview-Scheduler, PMReview-Scheduler, and Handoff all land here first. Approve to send via AgentMail; edit to tweak before sending; discard to drop. Manage which subagents need approval in <a onclick="document.querySelector('[onclick*=settings]').click()" style="color:var(--zen); cursor:pointer; text-decoration:underline;">Settings → Approval before sending</a>.
+      </div>
+    </div>
+  </main>
+
+  <!-- INSPECTOR -->
+  <aside class="inspector">
+    <div class="insp-inner" id="insp-content">
+      <!-- populated by JS; default = orchestrator -->
+    </div>
+  </aside>
+
+</div>
+
+<!-- ============ CREATE INBOX MODAL ============ -->
+<div id="create-inbox-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:300; align-items:center; justify-content:center;" onclick="closeCreateInbox(event)">
+  <div onclick="event.stopPropagation()" style="background:var(--panel); border-radius:14px; padding:0; width:480px; max-width:calc(100% - 32px); box-shadow:0 24px 48px rgba(0,0,0,0.2); overflow:hidden;">
+
+    <!-- Header -->
+    <div style="padding:20px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px;">
+      <div style="width:36px; height:36px; border-radius:8px; background:linear-gradient(135deg, #ea580c, #fb923c); display:grid; place-items:center; color:white; font-family:var(--mono); font-weight:700; font-size:14px;">AM</div>
+      <div style="flex:1;">
+        <div style="font-size:15px; font-weight:600; letter-spacing:-0.01em;">Create new inbox</div>
+        <div style="font-size:12px; color:var(--ink-muted); margin-top:2px;">Provisions a new inbox in your AgentMail account</div>
+      </div>
+      <button class="btn-icon ghost" onclick="closeCreateInbox(event)">
+        <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Form -->
+    <div id="create-inbox-form" style="padding:20px 24px;">
+      <div class="field-grid" style="display:grid; gap:14px;">
+        <div class="field">
+          <label style="font-size:12px; font-weight:500; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+            Username
+            <span class="tip">?<span class="tip-bubble">The part before the @. Letters, numbers, hyphens only. E.g. "jill-hm" becomes "jill-hm@diy.ai".</span></span>
+          </label>
+          <div style="display:flex; align-items:stretch; border:1px solid var(--border); border-radius:8px; overflow:hidden;" id="username-row">
+            <input id="new-inbox-username" class="input" placeholder="e.g. jill-eng" style="border:none; border-radius:0; flex:1;" oninput="updatePreview()" />
+            <div style="display:flex; align-items:center; padding:0 12px; background:var(--hover); border-left:1px solid var(--border); font-family:var(--mono); font-size:13px; color:var(--ink-muted);" id="domain-suffix">@diy.ai</div>
+          </div>
+          <div style="font-size:11px; color:#dc2626; margin-top:6px; display:none;" id="username-error">Username taken. Try another.</div>
+        </div>
+
+        <div class="field">
+          <label style="font-size:12px; font-weight:500; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+            Display name
+            <span class="tip">?<span class="tip-bubble">The "From" name candidates and HMs see. Plain English.</span></span>
+          </label>
+          <input id="new-inbox-display" class="input" placeholder="e.g. jill-eng (engineering hiring assistant)" />
+        </div>
+
+        <div class="field">
+          <label style="font-size:12px; font-weight:500; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+            Domain
+            <span class="tip">?<span class="tip-bubble">Use AgentMail's free shared domain to start, or your verified custom domain. Custom domains need DNS records set up in AgentMail first.</span></span>
+          </label>
+          <div class="select-box" onclick="toggleDomainPicker(event)" id="domain-picker">
+            <span id="domain-selected">diy.ai <span style="color:var(--ink-muted); font-size:11px; margin-left:6px;">(verified custom domain)</span></span>
+          </div>
+          <div id="domain-options" style="display:none; margin-top:4px; border:1px solid var(--border); border-radius:8px; padding:4px; background:var(--panel);">
+            <div onclick="selectDomain(event, 'diy.ai', '(verified custom domain)')" style="padding:8px 10px; border-radius:6px; font-size:13px; cursor:pointer;" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='transparent'">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-family:var(--mono);">diy.ai</span>
+                <span style="font-size:10px; color:#047857; background:#ecfdf5; padding:2px 6px; border-radius:3px; border:1px solid #bbf7d0;">verified</span>
+              </div>
+            </div>
+            <div onclick="selectDomain(event, 'agentmail.to', '(shared default — fastest to start)')" style="padding:8px 10px; border-radius:6px; font-size:13px; cursor:pointer;" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='transparent'">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-family:var(--mono);">agentmail.to</span>
+                <span style="font-size:10px; color:var(--ink-muted);">shared default · fastest to start</span>
+              </div>
+            </div>
+            <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+            <div style="padding:8px 10px; border-radius:6px; font-size:12px; color:var(--zen); cursor:pointer; display:flex; align-items:center; gap:6px;" onmouseover="this.style.background='var(--zen-bg)'" onmouseout="this.style.background='transparent'">
+              <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Add custom domain in AgentMail
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="font-size:12px; font-weight:500; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+            Webhook
+            <span class="tip">?<span class="tip-bubble">Subscribes this inbox to our orchestrator webhook so inbound emails trigger jill-diy. You can change this later.</span></span>
+          </label>
+          <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--hover); border:1px solid var(--border); border-radius:8px; font-size:12px;">
+            <input type="checkbox" checked style="width:14px; height:14px;" />
+            <span>Subscribe to <code style="font-family:var(--mono); font-size:11px; background:white; padding:1px 5px; border-radius:3px;">message.received</code> on our orchestrator endpoint</span>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div style="padding:12px 14px; background:var(--zen-bg); border:1px solid #ddd6fe; border-radius:8px;">
+          <div style="font-size:10px; font-weight:600; color:var(--zen); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">Preview</div>
+          <div style="font-family:var(--mono); font-size:13px; color:var(--ink); font-weight:600;" id="address-preview">jill-eng@diy.ai</div>
+          <div style="font-size:11px; color:var(--ink-muted); margin-top:4px;" id="display-preview">jill-eng (engineering hiring assistant)</div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:20px; justify-content:flex-end;">
+        <button class="btn-soft" onclick="closeCreateInbox(event)">Cancel</button>
+        <button class="btn-primary" id="create-inbox-btn" onclick="submitCreateInbox()">
+          <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Create inbox
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading state (hidden initially) -->
+    <div id="create-inbox-loading" style="display:none; padding:40px 24px; text-align:center;">
+      <div style="width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--ink); border-radius:50%; margin:0 auto 14px; animation:spin 0.8s linear infinite;"></div>
+      <div style="font-size:13px; font-weight:500;">Provisioning inbox in AgentMail…</div>
+      <div style="font-size:11px; color:var(--ink-muted); margin-top:4px;">Calling <code style="font-family:var(--mono);">POST /v0/inboxes</code></div>
+    </div>
+
+    <!-- Success state (hidden initially) -->
+    <div id="create-inbox-success" style="display:none; padding:32px 24px;">
+      <div style="text-align:center; margin-bottom:20px;">
+        <div style="width:44px; height:44px; border-radius:50%; background:#ecfdf5; display:grid; place-items:center; margin:0 auto 10px;">
+          <svg style="width:22px; height:22px; color:#16a34a;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+        </div>
+        <div style="font-size:15px; font-weight:600; letter-spacing:-0.01em;">Inbox created</div>
+        <div style="font-size:12px; color:var(--ink-muted); margin-top:4px;" id="success-address">jill-eng@diy.ai is ready to receive email</div>
+      </div>
+      <div style="background:var(--hover); border-radius:8px; padding:12px 14px; font-family:var(--mono); font-size:11px; color:var(--ink-muted); line-height:1.6;">
+        <div><span style="color:var(--ink);">id:</span> ib_8a2f9c1d</div>
+        <div><span style="color:var(--ink);">webhook:</span> subscribed ✓</div>
+        <div><span style="color:var(--ink);">DKIM / SPF:</span> verified ✓</div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:20px; justify-content:flex-end;">
+        <button class="btn-primary" onclick="finishCreateInbox()">Use this inbox</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .inbox-option:hover > div { background: var(--hover); }
+  .inbox-option[data-selected="true"] > div { background: var(--hover); }
+</style>
+
+<script>
+  // ============ NODE CONFIGS ============
+  const NODES = {
+    start: {
+      name: 'Start', subtitle: 'Entry point',
+      type: 'simple',
+      desc: 'Workflow entry. Triggered by inbound email webhook from AgentMail.',
+    },
+    end: {
+      name: 'End', subtitle: 'Workflow complete',
+      type: 'simple',
+      desc: 'Conversation turn complete. Workflow waits for the next inbound email to start again.',
+    },
+    orchestrator: {
+      name: 'Orchestrator', subtitle: 'Subagent · entry node',
+      type: 'subagent',
+      prompt: `You are the routing orchestrator for Jack, the candidate-side recruiting email agent.
+
+Each invocation you receive: the full email thread (from cache), the candidate's profile, active applications, and any open Bridge intro_requests.
+
+Choose exactly one routing tool to delegate the reply. Do not write the reply yourself. If the intent is unclear, default to "Asking about status".`,
+      llm: 'Claude Sonnet 4', voice: 'Hans Wilmar', eagerness: 'Normal',
+    },
+    intake: {
+      name: 'Jack-Intake', subtitle: 'Subagent',
+      type: 'subagent',
+      prompt: `You handle first contact with new candidates.
+
+When a candidate emails for the first time, or sends a resume, your job is to:
+· Parse the resume and extract structured profile fields
+· Ask any missing onboarding questions (location, comp expectations, role preferences)
+· Confirm the candidate's consent to be matched with employers`,
+      llm: 'Claude Sonnet 4', voice: 'Hans Wilmar', eagerness: 'Normal',
+      tools: ['parse_resume', 'create_candidate_profile', 'request_consent'],
+    },
+    updater: {
+      name: 'Jack-Updater', subtitle: 'Subagent',
+      type: 'subagent',
+      prompt: `You answer candidates' questions about the status of their applications.
+
+Always pull the truth from the ATS. Never invent progress, dates, or interviewer feedback. If you don't have an update, say so honestly and offer to check back in a few days.`,
+      llm: 'Claude Sonnet 4', voice: 'Hans Wilmar', eagerness: 'Normal',
+      tools: ['get_application_status', 'list_active_applications'],
+    },
+    coach: {
+      name: 'Jack-Coach', subtitle: 'Subagent',
+      type: 'subagent',
+      prompt: `You coach candidates through interview prep.
+
+Pull the JD and any known interview-stage details. Tailor your advice to the specific company and role. Offer practice questions, suggest STAR-format answers, and review resume bullets when asked.`,
+      llm: 'Claude Sonnet 4', voice: 'Hans Wilmar', eagerness: 'High',
+      tools: ['get_jd', 'get_interview_history', 'generate_practice_questions'],
+    },
+    scheduler: {
+      name: 'Jack-Scheduler', subtitle: 'Subagent',
+      type: 'subagent',
+      prompt: `You coordinate interview scheduling.
+
+Propose 3 time slots in the candidate's timezone that work for the interview panel. Confirm the chosen slot. Send calendar invites to all parties.`,
+      llm: 'Claude Sonnet 4', voice: 'Hans Wilmar', eagerness: 'High',
+      tools: ['get_candidate_calendar', 'get_panel_availability', 'send_calendar_invite'],
+    },
+    negotiator: {
+      name: 'Jack-Negotiator', subtitle: 'Subagent · high-stakes',
+      type: 'subagent',
+      highStakes: true,
+      prompt: `You help candidates review offers and draft counter-offers.
+
+Be precise about comp, equity, vesting, and benefits. Cite the source documents. Drafts always route to a human reviewer before sending — never assume your numbers are correct without a check.`,
+      llm: 'Claude Sonnet 4', voice: 'Hans Wilmar', eagerness: 'Cautious',
+      tools: ['get_offer_details', 'fetch_market_comp_data', 'draft_counter_offer'],
+    },
+    guardian_legacy_removed: {},
+    send_legacy_removed: {},
+
+    // ===== JILL-DIY (pipeline-stage subagents) =====
+    jill_orchestrator: {
+      name: 'Orchestrator', subtitle: 'Subagent · entry node',
+      type: 'subagent',
+      prompt: `You are jill-diy, the orchestrator of a hiring-pipeline email agent.
+
+You are added to a multi-party email thread that includes the hiring manager (HM) and one or more candidates. You DO NOT have an external system of record — your only context is this email thread itself.
+
+On every inbound email you receive: the full thread, and the latest message.
+
+Your job: read the latest message (usually from the HM) and pick exactly one stage subagent to handle the reply. The stage subagents act ON the thread.
+
+Routing rules — use the thread history to disambiguate:
+· If the HM says "intro <names>" and an intro hasn't happened yet → Intro-Setter
+· If the HM says "send <X> the take-home" and X has finished intro → TakeHome-Sender
+· If the HM says "have <colleague> code-review <X>" and X has submitted a take-home → CodeReview-Scheduler
+· If the HM says "loop in <PM> for the PM round with <X>" → PMReview-Scheduler
+· If the HM is asking "where are we" / "what's pending" → Status-Reporter
+· If the HM says "I'll take it from here" → Handoff
+
+Never invent a stage. If the thread shows a candidate hasn't done intro yet, you can't send a take-home — push back to the HM politely.
+
+You are stateless across threads. The thread is the only memory you have.`,
+      llm: 'Claude Sonnet 4', eagerness: 'Cautious',
+    },
+    jill_intro: {
+      name: 'Intro-Setter', subtitle: 'Pipeline stage · intro',
+      type: 'subagent',
+      prompt: `You introduce candidates to the hiring manager.
+
+Triggered when the HM picks candidates from a shortlist email (sent earlier by jackandjill.ai or another recruiter) and replies with names like "let's intro Priya and Marcus".
+
+For each named candidate:
+· Start a fresh email thread (one per candidate)
+· Cc the HM and jill-hm@diy.ai
+· Use a warm, professional intro template
+· Reference the role from the original shortlist context
+· Suggest 2-3 time slots for a 20-min intro call
+
+Never start a thread for a candidate the HM didn't explicitly name.`,
+      llm: 'Claude Sonnet 4', eagerness: 'Normal',
+      tools: ['start_new_thread', 'compose_intro_email', 'suggest_intro_slots'],
+    },
+    jill_takehome: {
+      name: 'TakeHome-Sender', subtitle: 'Pipeline stage · take-home',
+      type: 'subagent',
+      prompt: `You send take-home assignments to candidates the HM has chosen.
+
+Triggered when the HM, replying in a candidate's intro thread, says something like "send Priya the backend take-home" or "give Marcus the v2 frontend assignment".
+
+For the named candidate:
+· Find the right take-home document in the Knowledge Base by name
+· Reply in the same thread, addressing the candidate directly
+· Attach the take-home PDF
+· Include the HM's WhatsApp number for clarifying questions
+· State the deadline (default: 5 calendar days unless HM specified otherwise)
+· Ask the candidate to reply with the GitHub repo link when done
+
+Never invent a take-home name. If the HM-named take-home isn't in the KB, ask the HM to clarify or upload it.`,
+      llm: 'Claude Sonnet 4', eagerness: 'Normal',
+      tools: ['lookup_takehome_by_name', 'attach_file', 'send_reply_with_attachment'],
+    },
+    jill_codereview: {
+      name: 'CodeReview-Scheduler', subtitle: 'Pipeline stage · code review',
+      type: 'subagent',
+      prompt: `You schedule code-review rounds with internal colleagues.
+
+Triggered when the HM, after a candidate has submitted a GitHub link to a take-home, says "have Devon code-review Priya's submission" or "Sam can review Marcus's repo".
+
+For the named candidate + colleague:
+· Cc the named colleague on the existing thread
+· Share the candidate's GitHub link (pull from earlier in the thread)
+· Propose 3 time slots that respect the colleague's typical availability
+· Ask the colleague to confirm a slot and prepare 4-5 questions
+· Once confirmed, send a calendar invite to candidate + colleague + HM
+
+Never schedule with a colleague the HM didn't name.`,
+      llm: 'Claude Sonnet 4', eagerness: 'Normal',
+      tools: ['get_colleague_availability', 'extract_github_link_from_thread', 'send_calendar_invite'],
+    },
+    jill_pmreview: {
+      name: 'PMReview-Scheduler', subtitle: 'Pipeline stage · PM review',
+      type: 'subagent',
+      prompt: `You schedule product-review rounds with the PM the HM has chosen.
+
+Triggered when the HM, after code review is complete, says "loop in Mira for the PM round with Priya" or "set up a PM round with Devon as the interviewer".
+
+For the named candidate + PM:
+· Cc the PM on the existing thread
+· Share a brief recap of intro + take-home + code-review feedback (pull from earlier in the thread)
+· Propose 3 time slots
+· Once confirmed, send a calendar invite
+
+Never schedule with a PM the HM didn't name.`,
+      llm: 'Claude Sonnet 4', eagerness: 'Normal',
+      tools: ['get_colleague_availability', 'summarize_thread_for_handoff', 'send_calendar_invite'],
+    },
+    jill_status: {
+      name: 'Status-Reporter', subtitle: 'Utility · read-only',
+      type: 'subagent',
+      prompt: `You answer the HM's status questions about candidates and the pipeline.
+
+Triggered when the HM asks "where are we with Priya?", "what's pending?", "any candidates waiting on me?".
+
+· Read the cached thread(s) for the candidates in question
+· Summarize current stage (intro / take-home / code-review / PM-review / waiting on HM / no movement in X days)
+· Surface anything that looks blocked or stale
+· Never invent stages — if you can't tell from the thread, say so
+
+Read-only. You don't move anyone forward.`,
+      llm: 'Claude Sonnet 4', eagerness: 'Normal',
+      tools: ['list_active_threads', 'summarize_thread_stage'],
+    },
+    jill_handoff: {
+      name: 'Handoff', subtitle: 'Pipeline stage · exit',
+      type: 'subagent',
+      prompt: `You exit a candidate thread gracefully when the HM is ready to take over directly.
+
+Triggered when the HM says "I'll take it from here", "thanks jill, taking this over", "remove jill from this".
+
+· Post a brief recap of the stages completed
+· Confirm jill-diy is stepping out
+· Remove jill-hm@diy.ai from any future Cc
+· Archive the thread in our cache (HM can still reply normally; jill-diy just stops responding)`,
+      llm: 'Claude Sonnet 4', eagerness: 'Cautious',
+      tools: ['post_recap', 'remove_self_from_thread', 'archive_thread'],
+    },
+  };
+
+  // ============ EDGE CONFIGS ============
+  const EDGES = {
+    webhook: {
+      forward: { type: 'Event trigger', label: 'New email received', condition: 'Fires automatically when AgentMail webhook posts a message.received event to our endpoint.' },
+    },
+    route_intake: {
+      forward: { type: 'LLM Condition', label: 'New candidate or resume',
+        condition: 'The sender is a candidate Jack has never spoken to before, OR the message contains a resume attachment, OR this is the first email in the thread.' },
+    },
+    route_status: {
+      forward: { type: 'LLM Condition', label: 'Asking about status',
+        condition: 'The candidate is asking about the progress of one of their applications. Phrases like "any update", "have you heard back", "where am I in the process". This is also the safe default if the intent is ambiguous.' },
+    },
+    route_coach: {
+      forward: { type: 'LLM Condition', label: 'Interview prep',
+        condition: 'The candidate is asking for help preparing for an upcoming interview, wants resume feedback, or wants to practice answering questions.' },
+    },
+    route_schedule: {
+      forward: { type: 'LLM Condition', label: 'Scheduling',
+        condition: 'The candidate is proposing, confirming, or rescheduling an interview slot. Time references like "Tuesday at 3pm", "I am free next week".' },
+    },
+    route_negotiate: {
+      forward: { type: 'LLM Condition', label: 'Offer or negotiation',
+        condition: 'An offer has been extended and the candidate has questions about compensation, equity, benefits, or wants help drafting a counter-offer.' },
+    },
+
+    // ===== JILL-DIY =====
+    jill_webhook: {
+      forward: { type: 'Event trigger', label: 'New email received',
+        condition: 'Fires when AgentMail webhook posts a message.received event for jill-hm@diy.ai. Could be a reply from the HM, the candidate, or a colleague — orchestrator figures out who from the thread.' },
+    },
+    jill_route_intro: {
+      forward: { type: 'LLM Condition', label: 'Intro candidates',
+        condition: 'The HM is naming candidates from a recently-received shortlist and asking jill-diy to set up intro calls. Phrases: "let\'s intro X and Y", "set up calls with X", "reach out to A, B, C". Only valid if the thread shows an external shortlist was just sent in.' },
+    },
+    jill_route_takehome: {
+      forward: { type: 'LLM Condition', label: 'Send take-home',
+        condition: 'The HM, replying in a candidate\'s intro thread, is asking us to send a take-home assignment. Phrases: "send Priya the backend take-home", "give X the v2 frontend assignment". Take-home name must match one in the Knowledge Base.' },
+    },
+    jill_route_codereview: {
+      forward: { type: 'LLM Condition', label: 'Schedule code review',
+        condition: 'The HM is naming a colleague to code-review a candidate\'s submission. Phrases: "have Devon code-review X", "Sam can review Marcus\'s repo". Only valid if the candidate has submitted a GitHub link earlier in the thread.' },
+    },
+    jill_route_pmreview: {
+      forward: { type: 'LLM Condition', label: 'Schedule PM review',
+        condition: 'The HM is naming a PM to run the PM round. Phrases: "loop in Mira for the PM round with X", "set up PM round with Devon as interviewer". Only valid if code-review feedback exists in the thread.' },
+    },
+    jill_route_status: {
+      forward: { type: 'LLM Condition', label: 'Where are we with X?',
+        condition: 'The HM is asking for a status update. Phrases: "where are we with Priya", "what\'s pending", "any candidates blocked on me", "status check". Read-only — jill-diy does not advance any stage.' },
+    },
+    jill_route_handoff: {
+      forward: { type: 'LLM Condition', label: 'HM takes over',
+        condition: 'The HM signals they want to take the thread over directly. Phrases: "I\'ll take it from here", "thanks jill, taking over", "remove jill from this thread".' },
+    },
+  };
+
+  // ============ RENDER FUNCTIONS ============
+  function renderNodeInspector(key) {
+    const n = NODES[key];
+    if (!n) return;
+    let body = '';
+
+    const head = `
+      <div class="insp-head">
+        <div class="title">
+          <span class="node-icon" style="width:22px; height:22px;">
+            <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c0-3 3-5 7-5s7 2 7 5"/></svg>
+          </span>
+          ${n.name}
+        </div>
+        <div class="icons">
+          <button class="btn-icon ghost" title="Docs"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg></button>
+          <button class="btn-icon ghost" title="More"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+        </div>
+      </div>
+    `;
+
+    if (n.type === 'simple') {
+      body = head + `
+        <div style="font-size:12px; color:var(--ink-muted); margin-bottom:18px;">${n.subtitle}</div>
+        <div class="insp-section">
+          <div class="insp-label">About this node
+            <span class="tip">?<span class="tip-bubble">A system node. No configuration needed — it just marks the entry or exit of the workflow.</span></span>
+          </div>
+          <div style="font-size:12.5px; line-height:1.6; color:var(--ink); padding:12px; background:var(--hover); border-radius:8px;">${n.desc}</div>
+        </div>
+      `;
+    } else if (n.type === 'tool') {
+      body = head + `
+        <div style="font-size:12px; color:var(--ink-muted); margin-bottom:18px;">${n.subtitle}</div>
+        <div class="insp-section">
+          <div class="insp-label">What this node does
+            <span class="tip">?<span class="tip-bubble">A built-in action node — it calls AgentMail to send the reply.</span></span>
+          </div>
+          <div style="font-size:12.5px; line-height:1.6; color:var(--ink); padding:12px; background:var(--hover); border-radius:8px;">${n.desc}</div>
+        </div>
+      `;
+    } else {
+      // subagent or guard — build a tab-switchable inspector
+      const subagent = key;
+
+      const generalBody = `
+        <div class="insp-section">
+          <div class="insp-row">
+            <span class="insp-label">Prompt
+              <span class="tip">?<span class="tip-bubble">The instructions this agent follows. Write in plain English — no special syntax.</span></span>
+            </span>
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-muted);">
+              Override prompt
+              <span class="toggle"><input type="checkbox"><span class="track"></span><span class="knob"></span></span>
+            </label>
+          </div>
+          <textarea class="textarea lg">${n.prompt}</textarea>
+          <div class="vars-hint">Type <code>{{</code> to add variables</div>
+        </div>
+
+        <div class="insp-section">
+          <div class="insp-row">
+            <span class="insp-label">LLM
+              <span class="tip">?<span class="tip-bubble">The model that runs this agent. Sonnet for reasoning, Haiku for fast checks.</span></span>
+            </span>
+            <span class="insp-meta"><a>Using default</a></span>
+          </div>
+          <div class="select-box"><span>${n.llm}</span></div>
+        </div>
+
+        ${n.voice ? `
+        <div class="insp-section">
+          <div class="insp-row">
+            <span class="insp-label">Voice
+              <span class="tip">?<span class="tip-bubble">Used only when this agent speaks. Email-only agents can ignore this.</span></span>
+            </span>
+            <span class="insp-meta"><a>Using default</a></span>
+          </div>
+          <div class="select-box"><span class="avatar-sm"></span><span>${n.voice}</span></div>
+        </div>` : ''}
+
+        <div class="insp-section">
+          <div class="insp-row">
+            <span class="insp-label">Eagerness
+              <span class="tip">?<span class="tip-bubble">How proactive the agent is. Cautious = ask before acting. High = take initiative.</span></span>
+            </span>
+            <span class="insp-meta"><a>Using default</a></span>
+          </div>
+          <div class="select-box"><span>${n.eagerness}</span></div>
+        </div>
+
+        <div class="insp-section" style="background:var(--zen-bg); border:1px solid #ddd6fe; padding:14px; border-radius:8px;">
+          <div class="insp-row">
+            <span class="insp-label" style="color:var(--zen);">Outbound delivery
+              <span class="tip">?<span class="tip-bubble">Every reply from this subagent is automatically checked by Guardian and sent via AgentMail. Configured at the agent level — override here if needed.</span></span>
+            </span>
+            <a style="font-size:11px; color:var(--zen); text-decoration:underline;" onclick="showPage('settings', null)">Edit defaults</a>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <div style="flex:1; padding:8px 10px; background:white; border:1px solid var(--border); border-radius:6px; font-size:12px;">
+              <div style="font-weight:500; margin-bottom:2px;">Guardian</div>
+              <div style="color:var(--ink-muted); font-size:11px;">PII · claims · tone · using defaults</div>
+            </div>
+            <div style="flex:1; padding:8px 10px; background:white; border:1px solid var(--border); border-radius:6px; font-size:12px;">
+              <div style="font-weight:500; margin-bottom:2px;">Send</div>
+              <div style="color:var(--ink-muted); font-size:11px;">${n.highStakes ? 'Human approval required' : 'Auto-send on Guardian pass'}</div>
+            </div>
+          </div>
+          ${n.highStakes ? `
+          <div class="insp-row" style="margin-top:12px;">
+            <span class="insp-label" style="font-size:12px;">High-stakes (require human approval)
+              <span class="tip">?<span class="tip-bubble">Drafts from this subagent are held until a human approves them in Slack.</span></span>
+            </span>
+            <span class="toggle"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></span>
+          </div>` : ''}
+        </div>
+      `;
+
+      // KB content varies by subagent
+      const kbContent = renderKBTab(subagent);
+      const toolsContent = renderToolsTab(subagent, n);
+      const testsContent = renderTestsTab(subagent);
+      const edgesContent = renderEdgesTab(subagent);
+
+      body = head + `
+        <div style="font-size:12px; color:var(--ink-muted); margin-bottom:14px;">${n.subtitle}</div>
+        <div class="insp-tabs" id="insp-subtabs">
+          <div class="insp-tab active" onclick="switchSubTab(this, 'general')">General</div>
+          <div class="insp-tab" onclick="switchSubTab(this, 'kb')">Knowledge Base</div>
+          <div class="insp-tab" onclick="switchSubTab(this, 'tools')">Tools</div>
+          <div class="insp-tab" onclick="switchSubTab(this, 'tests')">Tests</div>
+          <div class="insp-tab" onclick="switchSubTab(this, 'edges')">Edges</div>
+        </div>
+        <div id="subtab-general">${generalBody}</div>
+        <div id="subtab-kb" style="display:none;">${kbContent}</div>
+        <div id="subtab-tools" style="display:none;">${toolsContent}</div>
+        <div id="subtab-tests" style="display:none;">${testsContent}</div>
+        <div id="subtab-edges" style="display:none;">${edgesContent}</div>
+      `;
+    }
+
+    document.getElementById('insp-content').innerHTML = body;
+  }
+
+  function switchSubTab(el, name) {
+    el.parentElement.querySelectorAll('.insp-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    ['general','kb','tools','tests','edges'].forEach(n => {
+      const el2 = document.getElementById('subtab-' + n);
+      if (el2) el2.style.display = n === name ? 'block' : 'none';
+    });
+  }
+
+  // ============ TAB CONTENT BUILDERS ============
+  const KB_BY_NODE = {
+    jill_orchestrator: [],
+    jill_intro: [
+      { name: 'intro-email-template.md', size: '4 KB', updated: '1 week ago' },
+    ],
+    jill_takehome: [
+      { name: 'take-home-backend-v3.pdf', size: '420 KB', updated: 'yesterday', tag: 'HM-approved' },
+      { name: 'take-home-frontend-v2.pdf', size: '380 KB', updated: 'yesterday', tag: 'HM-approved' },
+      { name: 'take-home-ml-v1.pdf', size: '510 KB', updated: '3 days ago', tag: 'HM-approved' },
+    ],
+    jill_codereview: [
+      { name: 'code-review-rubric.md', size: '6 KB', updated: '2 weeks ago' },
+    ],
+    jill_pmreview: [
+      { name: 'pm-round-question-bank.md', size: '11 KB', updated: '1 month ago' },
+    ],
+    jill_status: [],
+    jill_handoff: [
+      { name: 'handoff-recap-template.md', size: '2 KB', updated: '2 weeks ago' },
+    ],
+  };
+
+  function renderKBTab(subagent) {
+    const items = KB_BY_NODE[subagent] || [];
+    const isTakeHome = subagent === 'jill_takehome';
+    return `
+      <div class="insp-section">
+        <div class="insp-row">
+          <span class="insp-label">Documents
+            <span class="tip">?<span class="tip-bubble">Files this subagent can reference or attach. Used for templates, rubrics, or HM-approved materials.</span></span>
+          </span>
+          <button class="btn-soft" style="font-size:11px; padding:4px 10px;">+ Upload</button>
+        </div>
+        ${items.length === 0 ? `
+          <div style="padding:24px; background:var(--hover); border:1px dashed var(--border-strong); border-radius:8px; text-align:center; color:var(--ink-muted); font-size:12px;">
+            No documents yet. Upload a PDF, Markdown, or text file.
+          </div>
+        ` : `
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            ${items.map(it => `
+              <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:white; border:1px solid var(--border); border-radius:8px;">
+                <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--ink-muted);"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M13 2v7h7"/></svg>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:12.5px; font-weight:500;">${it.name}</div>
+                  <div style="font-size:10.5px; color:var(--ink-muted); font-family:var(--mono);">${it.size} · updated ${it.updated}</div>
+                </div>
+                ${it.tag ? `<span style="font-family:var(--mono); font-size:9px; padding:2px 6px; border-radius:4px; background:#ecfdf5; color:#047857; border:1px solid #bbf7d0;">${it.tag}</span>` : ''}
+                <button class="btn-icon ghost" style="width:24px; height:24px;"><svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+      ${isTakeHome ? `
+      <div class="insp-section" style="background:#fefce8; border:1px solid #fde047; padding:12px; border-radius:8px;">
+        <div style="font-size:12px; color:#713f12; line-height:1.55;">
+          <b style="color:#422006;">Tip:</b> Tag each take-home with <code style="font-family:var(--mono); background:white; padding:1px 4px; border-radius:3px;">HM-approved</code> once the HM has reviewed it. When the HM names a take-home in a reply (e.g. "send Priya the backend take-home"), <code style="font-family:var(--mono); background:white; padding:1px 4px; border-radius:3px;">lookup_takehome_by_name</code> matches against the filename.
+        </div>
+      </div>
+      ` : ''}
+    `;
+  }
+
+  const TOOLS_BY_NODE = {
+    jill_orchestrator: ['route_intro', 'route_takehome', 'route_codereview', 'route_pmreview', 'route_status', 'route_handoff'],
+    jill_intro: ['start_new_thread', 'compose_intro_email', 'suggest_intro_slots'],
+    jill_takehome: ['lookup_takehome_by_name', 'attach_file', 'send_reply_with_attachment'],
+    jill_codereview: ['get_colleague_availability', 'extract_github_link_from_thread', 'send_calendar_invite'],
+    jill_pmreview: ['get_colleague_availability', 'summarize_thread_for_handoff', 'send_calendar_invite'],
+    jill_status: ['list_active_threads', 'summarize_thread_stage'],
+    jill_handoff: ['post_recap', 'remove_self_from_thread', 'archive_thread'],
+  };
+
+  const TOOL_DESCRIPTIONS = {
+    start_new_thread: 'Opens a fresh email thread, addressed to the named candidate, with HM and jill-hm@diy.ai on Cc.',
+    compose_intro_email: 'Writes a warm, professional intro using the template in this subagent\'s Knowledge Base.',
+    suggest_intro_slots: 'Proposes 2-3 time slots for a 20-min intro call based on the HM\'s working hours.',
+    lookup_takehome_by_name: 'Matches a take-home name the HM mentioned (e.g. "backend") against filenames in the Knowledge Base. Returns the closest HM-approved match.',
+    attach_file: 'Attaches a file from the Knowledge Base to the outbound reply.',
+    send_reply_with_attachment: 'Sends the drafted reply via AgentMail with the attachment, preserving thread headers.',
+    get_colleague_availability: 'Asks the named colleague (Devon, Sam, Mira, etc.) for 3 available slots over the next 5 working days.',
+    extract_github_link_from_thread: 'Pulls the candidate\'s GitHub link from earlier in the thread. Fails loudly if not present.',
+    summarize_thread_for_handoff: 'Produces a 4-6 sentence recap of intro + take-home + code-review feedback for the incoming reviewer.',
+    send_calendar_invite: 'Books the agreed slot and sends an .ics invite to all parties.',
+    list_active_threads: 'Returns all candidate threads jill-diy is currently part of.',
+    summarize_thread_stage: 'For one thread, infers the candidate\'s current stage strictly from what\'s already happened in the thread.',
+    post_recap: 'Posts a brief recap of stages completed before exiting.',
+    remove_self_from_thread: 'Removes jill-hm@diy.ai from the To/Cc on all future replies in this thread.',
+    archive_thread: 'Marks the thread as archived in our cache. jill-diy stops responding; the HM continues normally.',
+  };
+
+  function renderToolsTab(subagent, n) {
+    const tools = TOOLS_BY_NODE[subagent] || [];
+    return `
+      <div class="insp-section">
+        <div class="insp-row">
+          <span class="insp-label">Available tools
+            <span class="tip">?<span class="tip-bubble">Functions this subagent can call. The LLM picks one based on the description.</span></span>
+          </span>
+          <button class="btn-soft" style="font-size:11px; padding:4px 10px;">+ Add tool</button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          ${tools.map(t => `
+            <div style="padding:10px 12px; background:white; border:1px solid var(--border); border-radius:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color:var(--zen);">
+                  <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4 4 0 105.6 5.6L21 11l-8 8-4 1 1-4 8-8 .7.3z"/></svg>
+                </span>
+                <span style="font-family:var(--mono); font-size:12px; font-weight:600;">${t}</span>
+                <span class="toggle" style="margin-left:auto;"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></span>
+              </div>
+              ${TOOL_DESCRIPTIONS[t] ? `<div style="font-size:11px; color:var(--ink-muted); margin-top:6px; line-height:1.5;">${TOOL_DESCRIPTIONS[t]}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTestsTab(subagent) {
+    return `
+      <div class="insp-section">
+        <div class="insp-row">
+          <span class="insp-label">Saved tests
+            <span class="tip">?<span class="tip-bubble">Replay sample emails through this subagent to check the reply quality before deploying.</span></span>
+          </span>
+          <button class="btn-soft" style="font-size:11px; padding:4px 10px;">+ New test</button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <div style="padding:10px 12px; background:white; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; gap:10px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#16a34a;"></span>
+            <div style="flex:1;">
+              <div style="font-size:12.5px; font-weight:500;">Happy path — typical request</div>
+              <div style="font-size:11px; color:var(--ink-muted);">Last run: 2 hours ago · Passed</div>
+            </div>
+            <button class="btn-soft" style="font-size:11px; padding:4px 10px;">Run</button>
+          </div>
+          <div style="padding:10px 12px; background:white; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; gap:10px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#16a34a;"></span>
+            <div style="flex:1;">
+              <div style="font-size:12.5px; font-weight:500;">Ambiguous intent — should route elsewhere</div>
+              <div style="font-size:11px; color:var(--ink-muted);">Last run: yesterday · Passed</div>
+            </div>
+            <button class="btn-soft" style="font-size:11px; padding:4px 10px;">Run</button>
+          </div>
+          <div style="padding:10px 12px; background:white; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; gap:10px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#d97706;"></span>
+            <div style="flex:1;">
+              <div style="font-size:12.5px; font-weight:500;">PII redaction — Guardian must block</div>
+              <div style="font-size:11px; color:var(--ink-muted);">Last run: 4 days ago · Needs review</div>
+            </div>
+            <button class="btn-soft" style="font-size:11px; padding:4px 10px;">Run</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const EDGES_OUT_BY_NODE = {
+    jill_orchestrator: [
+      { key: 'jill_route_intro', to: 'Intro-Setter', label: 'Intro candidates' },
+      { key: 'jill_route_takehome', to: 'TakeHome-Sender', label: 'Send take-home' },
+      { key: 'jill_route_codereview', to: 'CodeReview-Scheduler', label: 'Schedule code review' },
+      { key: 'jill_route_pmreview', to: 'PMReview-Scheduler', label: 'Schedule PM review' },
+      { key: 'jill_route_status', to: 'Status-Reporter', label: 'Where are we with X?' },
+      { key: 'jill_route_handoff', to: 'Handoff', label: 'HM takes over' },
+    ],
+  };
+
+  function renderEdgesTab(subagent) {
+    const out = EDGES_OUT_BY_NODE[subagent];
+    if (!out) {
+      return `
+        <div class="insp-section">
+          <div style="padding:20px; background:var(--hover); border-radius:8px; font-size:12px; color:var(--ink-muted); line-height:1.55;">
+            This subagent's reply ends the turn — the email is sent and the workflow waits for the next inbound message. No outbound edges to configure.
+          </div>
+        </div>
+      `;
+    }
+    return `
+      <div class="insp-section">
+        <div class="insp-row">
+          <span class="insp-label">Outbound edges
+            <span class="tip">?<span class="tip-bubble">Where this node can route to. Click an edge to edit its condition.</span></span>
+          </span>
+          <button class="btn-soft" style="font-size:11px; padding:4px 10px;">+ Add edge</button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          ${out.map(e => `
+            <div onclick="selectEdge('${e.key}', 'Orchestrator', '${e.to}')" style="padding:10px 12px; background:white; border:1px solid var(--border); border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:10px;">
+              <span style="color:var(--ink-muted);">
+                <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+              </span>
+              <div style="flex:1;">
+                <div style="font-size:12.5px; font-weight:500;">${e.label}</div>
+                <div style="font-size:11px; color:var(--ink-muted); font-family:var(--mono);">→ ${e.to}</div>
+              </div>
+              <span style="font-family:var(--mono); font-size:9px; padding:2px 6px; border-radius:4px; background:var(--zen-bg); color:var(--zen); border:1px solid #ddd6fe;">LLM Condition</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderEdgeInspector(key, fromNode, toNode) {
+    const e = EDGES[key];
+    if (!e) return;
+    const f = e.forward;
+    document.getElementById('insp-content').innerHTML = `
+      <div class="insp-head">
+        <div class="title">
+          ${fromNode} <span class="arrow-sep">→</span> ${toNode}
+        </div>
+        <div class="icons">
+          <button class="btn-icon ghost" onclick="selectNode('orchestrator')" title="Back to node">
+            <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="insp-tabs">
+        <div class="insp-tab active">Forward</div>
+        <div class="insp-tab">Backward</div>
+      </div>
+
+      <div class="insp-section">
+        <div class="insp-row">
+          <span class="insp-label">Transition type
+            <span class="tip">?<span class="tip-bubble">How this edge is followed. LLM Condition = agent decides based on description. Unconditional = always followed. Expression = code rule.</span></span>
+          </span>
+        </div>
+        <div class="select-box"><span>${f.type}</span></div>
+      </div>
+
+      <div class="insp-section">
+        <div class="insp-row">
+          <span class="insp-label">Label
+            <span class="tip">?<span class="tip-bubble">Short name shown on the canvas pill. Keep it under 30 characters.</span></span>
+          </span>
+        </div>
+        <input class="input" value="${f.label}" />
+      </div>
+
+      ${f.type === 'LLM Condition' ? `
+      <div class="insp-section">
+        <div class="insp-row">
+          <span class="insp-label">LLM condition
+            <span class="tip">?<span class="tip-bubble">Plain-English description the LLM reads to decide if this edge should be taken. Be specific about what triggers it.</span></span>
+          </span>
+        </div>
+        <textarea class="textarea lg">${f.condition}</textarea>
+        <div class="helper-text">Write this like you're explaining the rule to a teammate. The clearer you are, the more accurate the routing.</div>
+      </div>
+      ` : `
+      <div class="insp-section">
+        <div class="insp-row">
+          <span class="insp-label">Condition
+            <span class="tip">?<span class="tip-bubble">When this edge is followed.</span></span>
+          </span>
+        </div>
+        <textarea class="textarea">${f.condition}</textarea>
+      </div>
+      `}
+
+      <div class="insp-section">
+        <div class="insp-row">
+          <span class="insp-label">Priority
+            <span class="tip">?<span class="tip-bubble">If multiple edges from the same node match, the lower priority number wins.</span></span>
+          </span>
+        </div>
+        <div class="select-box"><span>Auto</span></div>
+      </div>
+    `;
+  }
+
+  // ============ INTERACTIONS ============
+  function selectNode(key) {
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+    document.querySelectorAll('.edge-group').forEach(g => g.classList.remove('selected'));
+    document.querySelectorAll('.edge-pill').forEach(p => p.classList.remove('selected'));
+    // jill nodes use node-jill-xxx (with dash), key uses jill_xxx
+    const id = 'node-' + key.replace(/_/g, '-');
+    const node = document.getElementById(id);
+    if (node) node.classList.add('selected');
+    renderNodeInspector(key);
+  }
+
+  function selectEdge(key, fromNode, toNode) {
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+    document.querySelectorAll('.edge-group').forEach(g => g.classList.remove('selected'));
+    document.querySelectorAll('.edge-pill').forEach(p => p.classList.remove('selected'));
+    const eg = document.querySelector(`[data-edge="${key}"]`);
+    if (eg) eg.classList.add('selected');
+    const pill = document.querySelector(`[data-pill="${key}"]`);
+    if (pill) pill.classList.add('selected');
+    renderEdgeInspector(key, fromNode, toNode);
+  }
+
+  function showPage(name, el) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (el) el.classList.add('active');
+    document.body.setAttribute('data-page', name);
+  }
+
+  // ============ AGENT SWITCHING ============
+  const AGENTS = {
+    jill: {
+      label: 'jill-diy',
+      topbar: 'jill-diy — Hiring Pipeline Agent',
+      avatar: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+      defaultNode: 'jill_orchestrator',
+    },
+  };
+  let currentAgent = 'jill';
+
+  function toggleAgentMenu(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('agent-menu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  }
+  document.addEventListener('click', () => {
+    const menu = document.getElementById('agent-menu');
+    if (menu) menu.style.display = 'none';
+  });
+
+  function switchAgent(name, e) {
+    if (e) e.stopPropagation();
+    currentAgent = name;
+    const a = AGENTS[name];
+    document.getElementById('agent-name').textContent = a.label;
+    document.getElementById('agent-avatar').style.background = a.avatar;
+    document.getElementById('topbar-agent-name').textContent = a.topbar;
+    document.querySelectorAll('.agent-canvas').forEach(c => {
+      c.style.display = c.dataset.agent === name ? 'block' : 'none';
+    });
+    document.querySelectorAll('.agent-check').forEach(c => {
+      c.style.display = c.dataset.agent === name ? 'block' : 'none';
+    });
+    document.getElementById('agent-menu').style.display = 'none';
+    selectNode(a.defaultNode);
+  }
+
+  // ============ SETTINGS INTERACTIVITY ============
+  let __saveTimer = null;
+  function showSaved() {
+    const ind = document.getElementById('save-indicator');
+    if (!ind) return;
+    ind.style.display = 'inline-flex';
+    clearTimeout(__saveTimer);
+    __saveTimer = setTimeout(() => ind.style.display = 'none', 1600);
+  }
+  function cycleOption(el, options) {
+    const span = el.querySelector('span');
+    const cur = span.textContent.trim();
+    const idx = options.indexOf(cur);
+    const next = options[(idx + 1) % options.length];
+    span.textContent = next;
+    el.style.background = 'var(--zen-bg)';
+    setTimeout(() => el.style.background = '', 200);
+    showSaved();
+  }
+  function onApprovalChange(input) {
+    updateStagedStatus();
+    showSaved();
+  }
+  function updateStagedStatus() {
+    const txt = document.getElementById('staged-status-text');
+    if (!txt) return;
+    const total = document.querySelectorAll('#approval-rows-container .approval-row').length;
+    const onCount = [...document.querySelectorAll('#approval-rows-container .approval-row .toggle input')].filter(i => i.checked).length;
+    if (onCount === 0) {
+      txt.textContent = '● All subagents send directly — no approval needed';
+      txt.style.color = '#16a34a';
+    } else {
+      txt.textContent = `● ${onCount} of ${total} subagents need your approval before sending`;
+      txt.style.color = '#a16207';
+    }
+  }
+  // Wire all native inputs and checkboxes inside settings to showSaved
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('#page-settings input').forEach(i => {
+      i.addEventListener('change', showSaved);
+      if (i.type === 'text' || i.type === 'password' || i.tagName === 'TEXTAREA') {
+        i.addEventListener('input', () => { clearTimeout(__saveTimer); __saveTimer = setTimeout(showSaved, 400); });
+      }
+    });
+    document.querySelectorAll('#page-settings textarea').forEach(i => {
+      i.addEventListener('input', () => { clearTimeout(__saveTimer); __saveTimer = setTimeout(showSaved, 400); });
+    });
+  });
+
+  // ============ AGENTMAIL INBOX MANAGEMENT ============
+  let currentDomain = 'diy.ai';
+
+  function toggleInboxDropdown(e) {
+    e.stopPropagation();
+    const dd = document.getElementById('inbox-dropdown');
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  }
+  function selectInbox(e, addr) {
+    e.stopPropagation();
+    document.getElementById('inbox-selected-label').textContent = addr;
+    document.getElementById('inbox-dropdown').style.display = 'none';
+    // Update preview area too if visible elsewhere
+  }
+  function refreshInboxes(e) {
+    e.stopPropagation();
+    const link = e.currentTarget;
+    const original = link.innerHTML;
+    link.innerHTML = '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 0.8s linear infinite;"><path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5"/></svg> Refreshing…';
+    setTimeout(() => {
+      link.innerHTML = original;
+      // In a real build this would call AgentMail list_inboxes and rebuild the options
+    }, 700);
+  }
+  document.addEventListener('click', () => {
+    const dd = document.getElementById('inbox-dropdown');
+    if (dd) dd.style.display = 'none';
+  });
+
+  function openCreateInbox(e) {
+    if (e) e.stopPropagation();
+    document.getElementById('inbox-dropdown').style.display = 'none';
+    // Reset state
+    document.getElementById('create-inbox-form').style.display = 'block';
+    document.getElementById('create-inbox-loading').style.display = 'none';
+    document.getElementById('create-inbox-success').style.display = 'none';
+    document.getElementById('new-inbox-username').value = '';
+    document.getElementById('new-inbox-display').value = '';
+    document.getElementById('username-error').style.display = 'none';
+    updatePreview();
+    document.getElementById('create-inbox-overlay').style.display = 'flex';
+    setTimeout(() => document.getElementById('new-inbox-username').focus(), 80);
+  }
+  function closeCreateInbox(e) {
+    if (e) e.stopPropagation();
+    document.getElementById('create-inbox-overlay').style.display = 'none';
+  }
+  function toggleDomainPicker(e) {
+    e.stopPropagation();
+    const opts = document.getElementById('domain-options');
+    opts.style.display = opts.style.display === 'none' ? 'block' : 'none';
+  }
+  function selectDomain(e, dom, note) {
+    e.stopPropagation();
+    currentDomain = dom;
+    document.getElementById('domain-selected').innerHTML = dom + ' <span style="color:var(--ink-muted); font-size:11px; margin-left:6px;">' + note + '</span>';
+    document.getElementById('domain-suffix').textContent = '@' + dom;
+    document.getElementById('domain-options').style.display = 'none';
+    updatePreview();
+  }
+  function updatePreview() {
+    const u = document.getElementById('new-inbox-username').value.trim() || 'jill-eng';
+    const d = document.getElementById('new-inbox-display').value.trim() || (u + ' (engineering hiring assistant)');
+    document.getElementById('address-preview').textContent = u + '@' + currentDomain;
+    document.getElementById('display-preview').textContent = d;
+  }
+  function submitCreateInbox() {
+    const u = document.getElementById('new-inbox-username').value.trim();
+    const d = document.getElementById('new-inbox-display').value.trim();
+    if (!u || !/^[a-z0-9][a-z0-9-]*$/i.test(u)) {
+      const err = document.getElementById('username-error');
+      err.textContent = 'Username can only contain letters, numbers, and hyphens.';
+      err.style.display = 'block';
+      return;
+    }
+    document.getElementById('username-error').style.display = 'none';
+
+    // Simulate AgentMail API call
+    document.getElementById('create-inbox-form').style.display = 'none';
+    document.getElementById('create-inbox-loading').style.display = 'block';
+    setTimeout(() => {
+      document.getElementById('create-inbox-loading').style.display = 'none';
+      document.getElementById('create-inbox-success').style.display = 'block';
+      const addr = u + '@' + currentDomain;
+      document.getElementById('success-address').textContent = addr + ' is ready to receive email';
+      window.__newInboxAddr = addr;
+      window.__newInboxDisplay = d || u + ' (hiring assistant)';
+    }, 1100);
+  }
+  function finishCreateInbox() {
+    const addr = window.__newInboxAddr;
+    if (addr) {
+      // Add to dropdown options
+      const dd = document.getElementById('inbox-dropdown');
+      const newOpt = document.createElement('div');
+      newOpt.className = 'inbox-option';
+      newOpt.setAttribute('data-addr', addr);
+      newOpt.onclick = (e) => selectInbox(e, addr);
+      newOpt.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px;">
+          <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--c-inbox);"><path d="M22 12h-6l-2 3h-4l-2-3H2M5 7l3-3h8l3 3v13a2 2 0 01-2 2H7a2 2 0 01-2-2V7z"/></svg>
+          <div style="flex:1;">
+            <div style="font-size:13px; font-weight:500;">${addr}</div>
+            <div style="font-size:11px; color:var(--ink-muted);">Active · 0 threads · just now</div>
+          </div>
+        </div>
+      `;
+      // Insert before the first separator
+      const firstSep = dd.querySelector('div[style*="border-top"]');
+      dd.insertBefore(newOpt, firstSep);
+      // Select it
+      document.getElementById('inbox-selected-label').textContent = addr;
+    }
+    closeCreateInbox();
+  }
+
+  // ============ INBOX DATA + RENDERER ============
+  const INBOX_THREADS = [
+    // ========== GOAL TYPE A: jackandjill.ai introduces a LIST of candidates ==========
+    {
+      id: 'thr_list_01', folder: 'awaiting_hm', stages: ['intro'], goal: 'shortlist',
+      from: 'jill-rohit@jackandjill.ai → you', time: '11:20',
+      subject: 'Shortlist: 8 candidates for Senior Designer role',
+      preview: '8 candidates ranked by JD match. Top picks: Tara, Liam, Yumi. Reply with the ones you want to intro.',
+      tags: ['shortlist'], userTags: [],
+      meta: { msgs: 1, status: 'awaiting HM', lastAction: 'shortlist arrived' },
+      messages: [
+        { from: 'jill-rohit@jackandjill.ai → you, jill-hm@diy.ai', time: '11:20',
+          body: 'Hi Rohit — shortlist for the Senior Designer role attached. 8 candidates, ranked by JD match.\n\nTop picks based on portfolio + JD fit:\n• Tara Chen — Stripe (4 yrs), Notion (2 yrs)\n• Liam O\'Brien — Linear, ex-Figma\n• Yumi Sato — Airtable, indie practice\n\nReply with the ones you would like to intro and jill-diy will take it from there.' }
+      ]
+    },
+
+    // ========== GOAL TYPE B: jackandjill.ai introduces a SINGLE candidate ==========
+    {
+      id: 'thr_single_01', folder: 'approval', stages: ['intro'], goal: 'single-intro',
+      from: 'jill-rohit@jackandjill.ai → you, Priya', time: '14:22',
+      subject: 'Intro: Priya Shah for Staff Backend',
+      preview: 'jill-diy drafted a take-home reply for Priya — awaiting your approval.',
+      tags: ['Take-home Sender'], userTags: ['Acme priority'],
+      meta: { msgs: 5, status: 'awaiting approval', lastAction: 'Take-home Sender' },
+      messages: [
+        { from: 'jill-rohit@jackandjill.ai → you, Priya Shah, jill-hm@diy.ai', time: '4 days ago',
+          body: 'Rohit, meet Priya Shah — backend engineer, 6 yrs, last at Stripe.\n\nPriya, meet Rohit, hiring manager at Zenlabs for the Staff Backend role.\n\nI will let you two take it from here. jill-diy is Cc\'d and can help with scheduling, take-homes, and intros to colleagues.' },
+        { from: 'you', time: '3 days ago',
+          body: 'Thanks. Priya, how does next week look for a 20-min chat?' },
+        { from: 'Priya Shah', time: '3 days ago',
+          body: 'Wed 11am IST works great. Looking forward.' },
+        { from: 'you', time: '14:20',
+          body: 'jill — intro went well. Send Priya the backend take-home and have Devon code-review when she\'s done.' },
+        { approval: true, sub: 'Take-home Sender', when: 'drafted 12s ago',
+          to: ['Priya Shah <priya.shah@…>'],
+          cc: ['you', 'jill-hm@diy.ai'],
+          bcc: [],
+          subjectLine: 'Backend take-home for Zenlabs Staff role',
+          body: 'Hi Priya,\n\nGreat chatting on the intro call. Attaching the backend take-home for the Staff role. It should take 4-6 hours of focused work; we suggest splitting across a couple of evenings.\n\n**Deadline:** Tue Mar 12, end of day IST (5 calendar days).\n**Submission:** reply to this thread with a public GitHub link.\n**Questions:** Rohit (HM) is reachable on WhatsApp at +91-98••• — feel free to ping for clarifications.\n\nGood luck — looking forward to seeing what you build.\n\n— jill-diy on behalf of Rohit',
+          attachment: { name: 'take-home-backend-v3.pdf', size: '420 KB', tag: 'HM-approved' },
+          caption: 'Drafted by Take-home Sender · checked by Guardian'
+        }
+      ]
+    },
+
+    // Goal B continued: another single intro further along (code-review stage)
+    {
+      id: 'thr_single_02', folder: 'approval', stages: ['codereview'], goal: 'single-intro',
+      from: 'jill-rohit@jackandjill.ai → you, Marcus, Sam', time: '13:45',
+      subject: 'Intro: Marcus Lin for Frontend Eng',
+      preview: 'jill-diy drafted a code review invite for Sam — awaiting your approval.',
+      tags: ['CodeReview Scheduler'], userTags: [],
+      meta: { msgs: 6, status: 'awaiting approval', lastAction: 'CodeReview Scheduler' },
+      messages: [
+        { from: 'jill-rohit@jackandjill.ai → you, Marcus Lin', time: '6 days ago',
+          body: 'Rohit, meet Marcus Lin — frontend engineer, ex-Linear. Marcus, meet Rohit, HM at Zenlabs.' },
+        { from: 'you', time: '5 days ago', body: 'Marcus — Wed at 3pm IST for a quick intro?' },
+        { from: 'Marcus Lin', time: '5 days ago', body: 'Works. See you then.' },
+        { from: 'you', time: '4 days ago', body: 'jill — send Marcus the v2 frontend take-home.' },
+        { from: 'Marcus Lin', time: 'Yesterday',
+          body: 'Submitted: https://github.com/marcuslin/zenlabs-frontend-v2 — happy to walk through anything.' },
+        // GOAL TYPE C: HM adds a colleague to the same thread
+        { from: 'you (added Sam to thread)', time: '13:30',
+          body: 'jill — have Sam code-review Marcus\'s repo this week. Adding Sam (sam@zenlabs.ai) to the Cc.' },
+        { approval: true, sub: 'CodeReview Scheduler', when: 'drafted 8s ago',
+          to: ['Sam Reyes <sam@zenlabs.ai>'],
+          cc: ['you', 'Marcus Lin', 'jill-hm@diy.ai'],
+          bcc: [],
+          subjectLine: 'Re: Intro: Marcus Lin for Frontend Eng',
+          body: 'Hi Sam,\n\nRohit asked if you could code-review Marcus Lin\'s submission for the Frontend Eng role.\n\n**Repo:** https://github.com/marcuslin/zenlabs-frontend-v2\n**Suggested slots for a 30-min walkthrough with Marcus:**\n• Thu 11am IST\n• Thu 3pm IST\n• Fri 10am IST\n\nReply with the slot that works and 4-5 questions you would like to ask. I will send the invite.\n\n— jill-diy on behalf of Rohit',
+          caption: 'Drafted by CodeReview Scheduler · checked by Guardian'
+        }
+      ]
+    },
+
+    // Goal C continued: PM added to existing thread
+    {
+      id: 'thr_single_03', folder: 'awaiting_hm', stages: ['pmreview'], goal: 'single-intro',
+      from: 'jill-rohit@jackandjill.ai → you, Elena, Devon, Mira', time: '09:32',
+      subject: 'Intro: Elena Rossi for Staff Backend',
+      preview: 'PM Mira added to thread for the PM round. Awaiting Mira to confirm slot.',
+      tags: ['PMReview Scheduler'], userTags: ['Hot pick'],
+      meta: { msgs: 9, status: 'awaiting HM', lastAction: 'PMReview Scheduler' },
+      messages: [
+        { from: 'jill-rohit@jackandjill.ai → you, Elena Rossi', time: '2 weeks ago',
+          body: 'Rohit, meet Elena Rossi — staff backend engineer, ex-Datadog.' },
+        { from: 'you', time: '2 weeks ago', body: 'Elena, intro chat next week?' },
+        { from: 'Elena Rossi', time: '12 days ago', body: 'Tue afternoon works.' },
+        { from: 'you', time: '10 days ago', body: 'jill — send the staff backend take-home.' },
+        { from: 'Elena Rossi', time: '5 days ago', body: 'Submitted: github.com/elenarossi/zen-backend' },
+        { from: 'you (added Devon to thread)', time: '4 days ago', body: 'jill — Devon to code-review.' },
+        { from: 'Devon Singh', time: '2 days ago', body: 'Code review done. Strong design sense, clean code. Recommend moving forward.' },
+        { from: 'you (added Mira to thread)', time: '09:30',
+          body: 'jill — looping in Mira (PM) for the product round with Elena. Mira, this is Elena (staff backend cand) — Devon already code-reviewed and gave a thumbs up.' },
+        { from: 'jill-diy → all', time: '09:32', agent: true,
+          body: 'Mira — sharing 3 slots for a 45-min PM round with Elena:\n• Wed 11am IST\n• Wed 3pm IST\n• Thu 10am IST\n\nRecap: Intro (Tue, 2 weeks ago, strong communication, deep on distributed systems) · Code review (Thu w/ Devon, clean architecture, recommended). Reply with your pick.',
+          caption: 'Drafted by PMReview Scheduler · checked by Guardian · sent' }
+      ]
+    },
+
+    // ========== Awaiting candidate examples ==========
+    {
+      id: 'thr_aw_cand_01', folder: 'awaiting_candidate', stages: ['intro'], goal: 'single-intro',
+      from: 'jill-rohit@jackandjill.ai → you, Aiko', time: 'Yesterday',
+      subject: 'Intro: Aiko Tanaka for Staff Backend',
+      preview: 'jill-diy proposed 3 intro slots. Awaiting Aiko to confirm.',
+      tags: ['Intro Setter'], userTags: [],
+      meta: { msgs: 4, status: 'awaiting candidate', lastAction: 'Intro Setter' },
+      messages: [
+        { from: 'jill-rohit@jackandjill.ai → you, Aiko Tanaka', time: '3 days ago',
+          body: 'Rohit, meet Aiko Tanaka — staff backend, ex-LINE. Aiko, meet Rohit.' },
+        { from: 'you', time: '2 days ago', body: 'jill — intro Aiko, propose times.' },
+        { from: 'jill-diy → Aiko, you', time: '2 days ago', agent: true,
+          body: 'Hi Aiko — Rohit (HM at Zenlabs) would like a 20-min intro about the Staff Backend role. Three options: Tue 4pm JST, Wed 2pm JST, Thu 10am JST. Which works?',
+          caption: 'Drafted by Intro Setter · checked by Guardian · sent' }
+      ]
+    },
+    {
+      id: 'thr_aw_cand_02', folder: 'awaiting_candidate', stages: ['takehome'], goal: 'single-intro',
+      from: 'jill-rohit@jackandjill.ai → you, Yumi', time: 'Mon 16:30',
+      subject: 'Intro: Yumi Sato for Senior Designer',
+      preview: 'Take-home sent 3 days ago, deadline Friday EOD. No reply yet.',
+      tags: ['Take-home Sender'], userTags: [],
+      meta: { msgs: 4, status: 'awaiting candidate', lastAction: 'Take-home Sender' },
+      messages: [
+        { from: 'jill-diy → Yumi, you', time: '3 days ago', agent: true,
+          body: 'Hi Yumi — attaching the frontend take-home for the Senior Designer role. Deadline Friday EOD. Questions to Rohit on WhatsApp.',
+          caption: 'Drafted by Take-home Sender · checked by Guardian · sent' }
+      ]
+    },
+
+    // ========== Status check ==========
+    {
+      id: 'thr_status_01', folder: 'all', stages: [], goal: 'status',
+      from: 'you only', time: '10:15',
+      subject: 'Status — anything blocked on me?',
+      preview: 'You asked for a status check. jill-diy listed 6 threads awaiting your input.',
+      tags: ['Status Reporter'], userTags: [],
+      meta: { msgs: 2, status: 'sent', lastAction: 'Status Reporter' },
+      messages: [
+        { from: 'you → jill-hm@diy.ai', time: '10:14', body: 'jill — quick status. What is blocked on me?' },
+        { from: 'jill-diy → you', time: '10:15', agent: true,
+          body: 'Hi Rohit — 6 threads need your input:\n\n• **Marcus Lin** (Frontend Eng) — submitted take-home, needs a code reviewer named\n• **Senior Designer shortlist** — 8 candidates from jackandjill.ai, awaiting your picks\n• **Aiko Tanaka** — proposed 3 intro slots, awaiting her reply (no nudge needed yet)\n• **Yumi Sato** — take-home sent Mon, deadline Fri, no reply yet\n• **Elena Rossi** — PM round, awaiting Mira to confirm slot\n• **Priya Shah** — take-home draft staged for your approval\n\nNothing else is blocked.',
+          caption: 'Drafted by Status Reporter · checked by Guardian · sent' }
+      ]
+    },
+
+    // ========== Handed off ==========
+    {
+      id: 'thr_handoff_01', folder: 'handed_off', stages: ['pmreview'], goal: 'single-intro',
+      from: 'jill-rohit@jackandjill.ai → you, Devon', time: 'Yesterday',
+      subject: 'Intro: Devon Park for Senior PM',
+      preview: 'You said "I will take it from here, thanks jill". Recap posted, jill-diy removed from thread.',
+      tags: ['Handoff'], userTags: [],
+      meta: { msgs: 8, status: 'handed off', lastAction: 'Handoff' },
+      messages: [
+        { from: 'you', time: 'Yesterday', body: 'jill — I will take it from here, thanks. Going to chat with Devon directly.' },
+        { from: 'jill-diy → Devon, you', time: 'Yesterday', agent: true,
+          body: 'Quick recap before stepping out:\n\n• Intro call: Tue, went well per Rohit\n• Take-home: submitted, code-review with Mira completed Thu\n• PM round: completed Fri with Lakshmi — positive feedback\n\nDevon, Rohit will reach out directly from here. Best of luck!',
+          caption: 'Drafted by Handoff · checked by Guardian · sent' }
+      ]
+    },
+
+    // ========== Archived ==========
+    {
+      id: 'thr_arch_01', folder: 'archived', stages: ['intro'], goal: 'single-intro',
+      from: 'jill-rohit@jackandjill.ai → you, Hiroshi', time: 'Last week',
+      subject: 'Intro: Hiroshi Yamamoto for Staff Backend',
+      preview: 'Candidate declined — not the right time. Archived.',
+      tags: ['Intro Setter'], userTags: ['Declined'],
+      meta: { msgs: 3, status: 'archived', lastAction: 'Intro Setter' },
+      messages: [
+        { from: 'Hiroshi Yamamoto', time: '1 week ago',
+          body: 'Thanks for reaching out — really appreciate it, but not the right time for me to move. Best of luck with the search!' }
+      ]
+    },
+  ];
+
+  const FOLDERS = [
+    { key: 'approval', label: 'Awaiting your approval', count: 2, badgeColor: '#ca8a04', section: 'main' },
+    { key: 'all', label: 'All threads', count: 10, section: 'main' },
+    { key: 'awaiting_hm', label: 'Awaiting HM', count: 3, badge: true, section: 'main' },
+    { key: 'awaiting_candidate', label: 'Awaiting candidate', count: 2, badge: true, section: 'main' },
+    { key: 'handed_off', label: 'Handed off to HM', count: 1, section: 'main' },
+    { key: 'archived', label: 'Archived', count: 1, section: 'main' },
+
+    { key: 'stage_intro', label: 'Intro', count: 4, section: 'stage', stage: 'intro' },
+    { key: 'stage_takehome', label: 'Take-home', count: 2, section: 'stage', stage: 'takehome' },
+    { key: 'stage_codereview', label: 'Code review', count: 1, section: 'stage', stage: 'codereview' },
+    { key: 'stage_pmreview', label: 'PM review', count: 2, section: 'stage', stage: 'pmreview' },
+  ];
+
+  let __activeFolder = 'approval';
+  let __activeThread = 'thr_single_01';
+
+  function renderFolders() {
+    const el = document.getElementById('inbox-folders');
+    if (!el) return;
+    const main = FOLDERS.filter(f => f.section === 'main');
+    const stages = FOLDERS.filter(f => f.section === 'stage');
+    el.innerHTML = `
+      <h4 style="margin-top:6px;">Folders</h4>
+      ${main.map(f => `
+        <a class="inbox-folder ${f.key === __activeFolder ? 'active' : ''}" onclick="setFolder('${f.key}')">
+          ${f.label}
+          ${f.badge ? `<span class="badge-new"${f.badgeColor ? ` style="background:${f.badgeColor};"` : ''}>${f.count}</span>` : `<span class="count">${f.count}</span>`}
+          ${f.badgeColor && !f.badge ? `<span class="badge-new" style="background:${f.badgeColor};">${f.count}</span>` : ''}
+        </a>
+      `).join('')}
+      <h4 style="margin-top:14px;">By stage</h4>
+      ${stages.map(f => `
+        <a class="inbox-folder ${f.key === __activeFolder ? 'active' : ''}" onclick="setFolder('${f.key}')">
+          ${f.label}<span class="count">${f.count}</span>
+        </a>
+      `).join('')}
+    `;
+  }
+
+  function threadsForFolder(key) {
+    const f = FOLDERS.find(x => x.key === key);
+    if (!f) return INBOX_THREADS;
+    if (key === 'all') return INBOX_THREADS;
+    if (f.section === 'stage') return INBOX_THREADS.filter(t => t.stages.includes(f.stage));
+    return INBOX_THREADS.filter(t => t.folder === key);
+  }
+
+  function renderThreadList() {
+    const el = document.getElementById('thread-list-content');
+    if (!el) return;
+    const threads = threadsForFolder(__activeFolder);
+    if (threads.length === 0) {
+      el.innerHTML = `<div style="padding:32px 20px; text-align:center; color:var(--ink-muted); font-size:13px;">No threads in this folder.</div>`;
+      return;
+    }
+    el.innerHTML = threads.map(t => {
+      const isApproval = t.folder === 'approval';
+      // tags = subagent name(s); userTags = user-added free-form
+      const sysTags = (t.tags || []).map(lbl =>
+        `<span class="thread-tag subagent">${escapeHtml(lbl)}</span>`
+      ).join('');
+      const userTags = (t.userTags || []).map(lbl =>
+        `<span class="thread-tag user-tag" style="background:#eef2ff; color:#4338ca; border-color:#c7d2fe;">${escapeHtml(lbl)}</span>`
+      ).join('');
+      const approvalTag = isApproval
+        ? `<span class="thread-tag warn" style="background:#fef3c7; color:#92400e; border-color:#fde68a;">awaiting approval</span>`
+        : '';
+      return `
+        <div class="thread-item ${t.id === __activeThread ? 'active' : ''}" onclick="setThread('${t.id}')">
+          <div class="thread-from"><span class="name">${escapeHtml(t.from)}</span><span class="time">${t.time}</span></div>
+          <div class="thread-subject">${escapeHtml(t.subject)}</div>
+          <div class="thread-preview">${escapeHtml(t.preview)}</div>
+          <div class="thread-tags">
+            ${sysTags}${userTags}${approvalTag}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderThreadDetail() {
+    const el = document.getElementById('thread-detail-content');
+    if (!el) return;
+    const threads = threadsForFolder(__activeFolder);
+    let t = threads.find(x => x.id === __activeThread);
+    if (!t && threads.length) { t = threads[0]; __activeThread = t.id; }
+    if (!t) {
+      el.innerHTML = `<div style="padding:32px 20px; text-align:center; color:var(--ink-muted); font-size:13px;">Select a thread to view.</div>`;
+      return;
+    }
+    // Build editable tag row for thread detail
+    const userTagsHtml = (t.userTags || []).map((tag, i) =>
+      `<span class="user-tag-chip" data-idx="${i}" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:3px 8px 3px 10px; border-radius:999px; background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe;">
+         ${escapeHtml(tag)}
+         <span onclick="removeUserTag(event, '${t.id}', ${i})" style="cursor:pointer; opacity:0.6; font-size:13px; line-height:1;">×</span>
+       </span>`
+    ).join('');
+    const statusColor = t.meta.status === 'awaiting approval' ? '#ca8a04' :
+                        t.meta.status === 'handed off' ? 'var(--ink-muted)' :
+                        t.meta.status === 'archived' ? 'var(--ink-muted)' :
+                        t.meta.status === 'awaiting candidate' ? '#0891b2' :
+                        t.meta.status === 'awaiting HM' ? '#dc2626' : '#16a34a';
+    el.innerHTML = `
+      <div class="thread-header">
+        <div class="thread-detail-subject">${escapeHtml(t.subject)}</div>
+        <div class="thread-detail-meta">
+          <span>${t.id}</span>
+          <span>${t.meta.msgs} messages</span>
+          <span style="color:${statusColor};">${t.meta.status}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:10px; flex-wrap:wrap;">
+          <span style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-muted); margin-right:4px;">Your tags:</span>
+          ${userTagsHtml || '<span style="font-size:11px; color:var(--ink-faint);">none yet</span>'}
+          <button onclick="addUserTag(event, '${t.id}')" style="display:inline-flex; align-items:center; gap:3px; font-size:11px; padding:3px 8px; border-radius:999px; background:white; color:var(--ink-muted); border:1px dashed var(--border-strong); cursor:pointer;">
+            <svg style="width:10px; height:10px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Add tag
+          </button>
+        </div>
+      </div>
+      <div class="thread-messages">
+        ${t.messages.map(m => m.approval ? renderApprovalCard(m, t.id) : renderMessage(m)).join('')}
+      </div>
+    `;
+  }
+
+  function renderMessage(m) {
+    // For agent messages, show plain-English caption — NO engineer trace
+    const captionHtml = m.caption ? `
+      <div style="margin-top:8px; font-size:11px; color:var(--ink-muted); font-style:italic;">${escapeHtml(m.caption)}</div>
+    ` : '';
+    return `
+      <div class="msg ${m.agent ? 'agent' : ''}">
+        <div class="msg-from">${escapeHtml(m.from)} <span class="time">${m.time}</span></div>
+        <div class="msg-body" style="white-space:pre-line;">${formatBody(m.body)}</div>
+        ${captionHtml}
+      </div>
+    `;
+  }
+
+  function renderApprovalCard(m, threadId) {
+    // Editable chip rows for To / Cc / Bcc — AgentMail supports all three on send + reply
+    const chipRow = (label, list, field) => `
+      <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;">
+        <span style="font-size:11px; font-weight:600; color:var(--ink); width:34px; padding-top:5px; flex-shrink:0;">${label}</span>
+        <div style="flex:1; display:flex; align-items:center; gap:4px; flex-wrap:wrap; padding:4px 6px; background:white; border:1px solid var(--border); border-radius:6px; min-height:28px;" data-chip-row="${field}" data-thread="${threadId}">
+          ${list.map((addr, i) => `
+            <span class="addr-chip" data-idx="${i}" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 6px 2px 8px; border-radius:999px; background:var(--hover); border:1px solid var(--border);">
+              ${escapeHtml(addr)}
+              <span onclick="removeAddr(event, '${threadId}', '${field}', ${i})" style="cursor:pointer; opacity:0.6; font-size:13px; line-height:1;">×</span>
+            </span>
+          `).join('')}
+          <input type="text" placeholder="${list.length ? '' : 'add email…'}" style="flex:1; min-width:80px; border:none; outline:none; font-size:11px; padding:2px 4px; background:transparent;" onkeydown="addAddrOnEnter(event, '${threadId}', '${field}')" />
+        </div>
+      </div>
+    `;
+    const toList = Array.isArray(m.to) ? m.to : (m.to ? [m.to] : []);
+    const ccList = Array.isArray(m.cc) ? m.cc : (m.cc ? [m.cc] : []);
+    const bccList = Array.isArray(m.bcc) ? m.bcc : (m.bcc ? [m.bcc] : []);
+    return `
+      <div class="msg" style="border-bottom:none; padding-bottom:0; margin-bottom:0;">
+        <div style="background:#fefce8; border:1.5px solid #fde047; border-radius:10px; padding:14px 16px; margin-top:8px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+            <span style="font-size:10px; font-weight:600; padding:3px 8px; border-radius:4px; background:#ca8a04; color:white; text-transform:uppercase; letter-spacing:0.04em;">Awaiting your approval</span>
+            <span style="font-size:11px; color:#a16207;">${escapeHtml(m.when)}</span>
+          </div>
+
+          ${chipRow('To', toList, 'to')}
+          ${chipRow('Cc', ccList, 'cc')}
+          ${chipRow('Bcc', bccList, 'bcc')}
+
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; margin-top:4px;">
+            <span style="font-size:11px; font-weight:600; color:var(--ink); width:34px; flex-shrink:0;">Subject</span>
+            <input type="text" value="${escapeHtml(m.subjectLine)}" style="flex:1; font-size:13px; padding:6px 10px; background:white; border:1px solid var(--border); border-radius:6px; font-weight:500;" />
+          </div>
+
+          <div style="background:white; border:1px solid var(--border); border-radius:8px; padding:14px 16px; font-size:13px; line-height:1.6; color:var(--ink); white-space:pre-line; min-height:120px;" contenteditable="true">${formatBody(m.body)}</div>
+
+          ${m.attachment ? `
+            <div style="display:flex; align-items:center; gap:8px; margin-top:10px; padding:8px 10px; background:white; border:1px solid var(--border); border-radius:6px;">
+              <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--ink-muted);"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              <span style="font-size:12px; font-family:var(--mono);">${escapeHtml(m.attachment.name)}</span>
+              <span style="font-size:11px; color:var(--ink-muted);">· ${m.attachment.size} · from Knowledge Base</span>
+              ${m.attachment.tag ? `<span style="margin-left:auto; font-size:10px; font-family:var(--mono); padding:2px 6px; border-radius:3px; background:#ecfdf5; color:#047857; border:1px solid #bbf7d0;">${m.attachment.tag}</span>` : ''}
+            </div>` : ''}
+
+          <div style="display:flex; gap:8px; margin-top:14px;">
+            <button class="btn-primary" style="background:#16a34a; flex:1;" onclick="approveDraft(event, '${threadId}')">
+              <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+              Approve &amp; send
+            </button>
+            <button class="btn-soft" style="color:#dc2626;">
+              <svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+              Discard
+            </button>
+          </div>
+
+          <div style="margin-top:10px; font-size:11px; color:var(--ink-muted); font-style:italic; text-align:center;">${escapeHtml(m.caption || 'Drafted by jill-diy · checked by Guardian · awaiting your approval')}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ===== Address chip handlers =====
+  function addAddrOnEnter(e, threadId, field) {
+    if (e.key !== 'Enter' && e.key !== ',') return;
+    e.preventDefault();
+    const input = e.currentTarget;
+    const val = input.value.trim().replace(/,$/, '');
+    if (!val) return;
+    const t = INBOX_THREADS.find(x => x.id === threadId);
+    if (!t) return;
+    // last message is the approval card
+    const m = t.messages[t.messages.length - 1];
+    if (!m || !m.approval) return;
+    const list = Array.isArray(m[field]) ? m[field] : (m[field] ? [m[field]] : []);
+    list.push(val);
+    m[field] = list;
+    input.value = '';
+    renderThreadDetail();
+  }
+  function removeAddr(e, threadId, field, idx) {
+    e.stopPropagation();
+    const t = INBOX_THREADS.find(x => x.id === threadId);
+    if (!t) return;
+    const m = t.messages[t.messages.length - 1];
+    if (!m || !m.approval) return;
+    const list = Array.isArray(m[field]) ? m[field] : [];
+    list.splice(idx, 1);
+    m[field] = list;
+    renderThreadDetail();
+  }
+  function addUserTag(e, threadId) {
+    e.stopPropagation();
+    const tag = prompt('Add a tag for this thread (e.g. "Acme priority", "Backup", "Follow up next week"):');
+    if (!tag || !tag.trim()) return;
+    const t = INBOX_THREADS.find(x => x.id === threadId);
+    if (!t) return;
+    t.userTags = t.userTags || [];
+    t.userTags.push(tag.trim());
+    renderThreadDetail();
+    renderThreadList();
+  }
+  function removeUserTag(e, threadId, idx) {
+    e.stopPropagation();
+    const t = INBOX_THREADS.find(x => x.id === threadId);
+    if (!t || !t.userTags) return;
+    t.userTags.splice(idx, 1);
+    renderThreadDetail();
+    renderThreadList();
+  }
+
+  function setFolder(key) {
+    __activeFolder = key;
+    const threads = threadsForFolder(key);
+    if (threads.length) __activeThread = threads[0].id;
+    renderFolders();
+    renderThreadList();
+    renderThreadDetail();
+  }
+  function setThread(id) {
+    __activeThread = id;
+    renderThreadList();
+    renderThreadDetail();
+  }
+  function approveDraft(e, threadId) {
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    btn.innerHTML = '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg> Sent ✓';
+    btn.style.background = '#15803d';
+    btn.disabled = true;
+  }
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function formatBody(s) {
+    // bold via **text**
+    return escapeHtml(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  }
+  // First render
+  renderFolders();
+  renderThreadList();
+  renderThreadDetail();
+
+  // Initialize
+  switchAgent('jill', null);
+</script>
+
+</body>
+</html>
