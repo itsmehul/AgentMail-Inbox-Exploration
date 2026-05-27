@@ -7,8 +7,10 @@ import Link from "next/link";
 import { InboxToolbar } from "./InboxToolbar";
 import { ThreadDetail } from "./ThreadDetail";
 import { ThreadList } from "./ThreadList";
+import { useInboxUrlSync } from "./useInboxUrlSync";
 
 export function InboxPage() {
+  useInboxUrlSync();
   const activeFolder = useInboxStore((s) => s.activeFolder);
   const setFolder = useInboxStore((s) => s.setFolder);
 

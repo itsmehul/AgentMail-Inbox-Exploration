@@ -1,5 +1,7 @@
 # Jill DIY — Email Orchestrator
 
+https://base-agentmailtest-ilooma-d82018-95-216-192-198.traefik.me
+
 Prototype for monitoring hiring-pipeline email threads, approving agent drafts, unblocking stuck automation, and scoring pipeline stages. Built as a take-home exercise extending the original HTML mock (`jill-diy-v12 (1).html`).
 
 ## Getting started
@@ -25,7 +27,7 @@ Other scripts: `pnpm build`, `pnpm start`, `pnpm lint`.
 
 | Route | Description |
 |-------|-------------|
-| `/inbox` | Three-column inbox: folders, thread list, thread detail |
+| `/inbox` | Three-column inbox: folders, thread list, thread detail; inbox state synced to URL query params |
 | `/workflow` | Visual editor for Jill subagent workflow nodes and edges |
 | `/settings` | Inbox selector and approval subagent configuration |
 | `/agent` | Agent identity settings (Jack placeholder) |
@@ -33,7 +35,7 @@ Other scripts: `pnpm build`, `pnpm start`, `pnpm lint`.
 Key directories:
 
 - `components/inbox/` — thread list, detail, approval compose, blocked resolution, search
-- `lib/inbox/` — stage grouping, blocked-thread config, approval diff, org-user matching
+- `lib/inbox/` — stage grouping, blocked-thread config, approval diff, org-user matching, inbox URL param helpers
 - `stores/` — Zustand stores for inbox, rubrics, memory, workflow, settings
 - `lib/mock/` — sample threads, org users, scoring rubrics, workflow graph
 
@@ -50,6 +52,7 @@ Key directories:
 9. User specific search similar to Linear — multi-select team-member filter in the inbox toolbar
 10. If there is any modifications to the approval card and then sent, the user is asked if they want to commit this change to memory
 11. Internal comments that can be tied to the thread and the stage the user is in to declutter the main thread
+12. Shareable inbox URLs — active thread, folder, search, mode, and team filter reflected in query params
 
 ---
 
@@ -71,6 +74,26 @@ Each thread is split into pipeline stages. The active (last) stage is always exp
 - Approval compose card with To/Cc/Bcc chips, editable body, attachment row, and Send — mirrors Gmail's reply/compose patterns
 
 Try **Awaiting your approval** → `thr_single_01` for the full approval + scoring flow.
+
+### Shareable inbox URLs
+
+Inbox UI state is kept in sync with the URL so every open conversation thread can be bookmarked or shared. Selecting a folder, thread, search query, search mode, or team filter updates the address bar; reloading or using back/forward restores the same view.
+
+| Param | Description |
+|-------|-------------|
+| `thread` | Active thread ID (always present) |
+| `folder` | Active folder key (omitted when `approval`) |
+| `q` | Search query |
+| `mode` | `query` or `agent` |
+| `users` | Comma-separated org user IDs for the team filter |
+
+Examples:
+
+- `/inbox?thread=thr_single_01` — default approval folder, Priya intro thread
+- `/inbox?thread=thr_blocked_01&folder=blocked` — blocked resolution flow
+- `/inbox?thread=thr_list_01&folder=all&q=shortlist` — search within All threads
+
+If `thread` points to a thread that is not visible in the current folder (e.g. a blocked thread with only `thread` in the URL), the app switches to an appropriate folder automatically. Implementation lives in `lib/inbox/inbox-search-params.ts` and `components/inbox/useInboxUrlSync.ts`.
 
 ### Stage scoring and rubric feedback
 
