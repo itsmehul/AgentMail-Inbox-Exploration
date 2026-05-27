@@ -7,6 +7,44 @@ export interface AgentConfig {
   defaultNode: string;
 }
 
+export type BlockReason = "unclear_intent" | "delegation_stuck" | "failure";
+
+export interface BlockResolutionOption {
+  id: string;
+  label: string;
+  description?: string;
+  requiresInput?: boolean;
+  inputPlaceholder?: string;
+}
+
+export interface BlockedResolutionConfig {
+  title: string;
+  description: string;
+  fixLink?: {
+    label: string;
+    href: string;
+    hint?: string;
+  };
+  /** Pick-one wizard; optional free-text overrides selection when filled. */
+  wizard?: {
+    options: BlockResolutionOption[];
+    allowCustomInstructions?: boolean;
+    instructionsPlaceholder?: string;
+  };
+  /** Standalone instruction input when no wizard is shown. */
+  instructions?: {
+    placeholder: string;
+    submitLabel: string;
+  };
+  submitLabel: string;
+}
+
+export interface BlockResolutionPayload {
+  optionId?: string;
+  optionInput?: string;
+  instructions?: string;
+}
+
 export interface ThreadMeta {
   msgs: number;
   status: string;
@@ -75,6 +113,8 @@ export interface Thread {
   preview: string;
   tags: string[];
   userTags: string[];
+  /** Set when jill-diy cannot proceed without intervention. */
+  blockReason?: BlockReason;
   meta: ThreadMeta;
   stageScores?: StageScores;
   internalComments?: ThreadInternalComment[];
@@ -85,7 +125,7 @@ export interface Folder {
   key: string;
   label: string;
   count: number;
-  section: "main" | "stage";
+  section: "main" | "stage" | "chat";
   badge?: boolean;
   badgeColor?: string;
   stage?: string;

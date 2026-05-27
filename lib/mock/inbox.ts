@@ -509,6 +509,213 @@ export const INBOX_THREADS: Thread[] = [
         "body": "Thanks for reaching out — really appreciate it, but not the right time for me to move. Best of luck with the search!"
       }
     ]
+  },
+  {
+    "id": "thr_blocked_01",
+    "folder": "blocked",
+    "stages": [
+      "intro"
+    ],
+    "goal": "single-intro",
+    "from": "jill-rohit@jackandjill.ai → you, Kenji",
+    "time": "09:05",
+    "subject": "Intro: Kenji Watanabe for Staff Backend",
+    "preview": "HM asked to \"revisit the approach\" — orchestrator could not pick a subagent.",
+    "tags": [
+      "Orchestrator"
+    ],
+    "userTags": [],
+    "blockReason": "unclear_intent",
+    "meta": {
+      "msgs": 4,
+      "status": "blocked — unclear intent",
+      "lastAction": "Orchestrator"
+    },
+    "messages": [
+      {
+        "from": "jill-rohit@jackandjill.ai → you, Kenji Watanabe",
+        "time": "2 days ago",
+        "stage": "intro",
+        "body": "Rohit, meet Kenji Watanabe — staff backend, ex-Mercari. Kenji, meet Rohit."
+      },
+      {
+        "from": "Kenji Watanabe",
+        "time": "Yesterday",
+        "stage": "intro",
+        "body": "Thanks for the intro. Before we schedule — is this role fully remote or hybrid? Also curious how the team handles on-call."
+      },
+      {
+        "from": "you",
+        "time": "09:02",
+        "stage": "intro",
+        "body": "Good questions — let's revisit the approach here, jill. I want to be thoughtful before we go further."
+      },
+      {
+        "from": "jill-diy → you",
+        "time": "09:05",
+        "stage": "intro",
+        "agent": true,
+        "body": "I read Rohit's note as a pause on scheduling, but I'm not sure whether to (a) answer Kenji's remote/on-call questions directly, (b) wait for Rohit to reply in-thread, or (c) route to Status Reporter. None of the routing tools matched confidently.\n\n**Needs your call** before I reply to Kenji.",
+        "caption": "Orchestrator · no confident route · held"
+      }
+    ]
+  },
+  {
+    "id": "thr_blocked_02",
+    "folder": "blocked",
+    "stages": [
+      "takehome"
+    ],
+    "goal": "single-intro",
+    "from": "jill-rohit@jackandjill.ai → you, Sofia",
+    "time": "08:40",
+    "subject": "Intro: Sofia Reyes for Frontend Eng",
+    "preview": "Take-home Sender retried 3 times — Guardian keeps rejecting the attachment tag.",
+    "tags": [
+      "Take-home Sender",
+      "Guardian"
+    ],
+    "userTags": [],
+    "blockReason": "delegation_stuck",
+    "meta": {
+      "msgs": 5,
+      "status": "blocked — delegation stuck",
+      "lastAction": "Take-home Sender"
+    },
+    "messages": [
+      {
+        "from": "jill-rohit@jackandjill.ai → you, Sofia Reyes",
+        "time": "4 days ago",
+        "stage": "intro",
+        "body": "Rohit, meet Sofia Reyes — frontend engineer, ex-Vercel."
+      },
+      {
+        "from": "you",
+        "time": "3 days ago",
+        "stage": "intro",
+        "body": "Intro went well. jill — send Sofia the frontend take-home v2."
+      },
+      {
+        "from": "jill-diy → you",
+        "time": "Yesterday",
+        "stage": "takehome",
+        "agent": true,
+        "body": "Drafted take-home for Sofia. Guardian flagged the PDF tag as \"HM-approved\" but I can't find an approval record on this thread. Retrying with \"draft\" tag…",
+        "caption": "Take-home Sender → Guardian · attempt 1/3"
+      },
+      {
+        "from": "jill-diy → you",
+        "time": "08:38",
+        "stage": "takehome",
+        "agent": true,
+        "body": "Guardian rejected again — attachment metadata still inconsistent. Take-home Sender exhausted its retry loop.\n\n**Stuck:** can't send until attachment tagging is resolved or you override.",
+        "caption": "Take-home Sender → Guardian · attempt 3/3 · stopped"
+      }
+    ]
+  },
+  {
+    "id": "thr_blocked_03",
+    "folder": "blocked",
+    "stages": [
+      "codereview"
+    ],
+    "goal": "single-intro",
+    "from": "jill-rohit@jackandjill.ai → you, Alex, Jamie",
+    "time": "07:55",
+    "subject": "Intro: Alex Kim for Staff Backend",
+    "preview": "CodeReview Scheduler nudged Jamie 3× — no slot confirmation, auto-escalation triggered.",
+    "tags": [
+      "CodeReview Scheduler"
+    ],
+    "userTags": [],
+    "blockReason": "delegation_stuck",
+    "meta": {
+      "msgs": 7,
+      "status": "blocked — delegation stuck",
+      "lastAction": "CodeReview Scheduler"
+    },
+    "messages": [
+      {
+        "from": "Alex Kim",
+        "time": "3 days ago",
+        "stage": "takehome",
+        "body": "Submitted: github.com/alexkim/zen-backend — ready for review."
+      },
+      {
+        "from": "you (added Jamie to thread)",
+        "time": "2 days ago",
+        "stage": "codereview",
+        "body": "jill — Jamie to code-review Alex's repo this week."
+      },
+      {
+        "from": "jill-diy → Jamie, you, Alex",
+        "time": "2 days ago",
+        "stage": "codereview",
+        "agent": true,
+        "body": "Hi Jamie — Alex submitted the staff backend take-home. Suggested walkthrough slots: Mon 2pm, Tue 11am, Wed 4pm IST. Reply with your pick.",
+        "caption": "CodeReview Scheduler · sent"
+      },
+      {
+        "from": "jill-diy → Jamie",
+        "time": "Yesterday",
+        "stage": "codereview",
+        "agent": true,
+        "body": "Bump — still waiting on a slot from Jamie for Alex's code review. Nudge 2/3.",
+        "caption": "CodeReview Scheduler · auto-nudge"
+      },
+      {
+        "from": "jill-diy → you",
+        "time": "07:55",
+        "stage": "codereview",
+        "agent": true,
+        "body": "Jamie hasn't responded after 3 nudges over 48h. CodeReview Scheduler won't send another without a named backup reviewer.\n\n**Stuck:** need you to ping Jamie or name someone else.",
+        "caption": "CodeReview Scheduler · escalation · held"
+      }
+    ]
+  },
+  {
+    "id": "thr_blocked_04",
+    "folder": "blocked",
+    "stages": [
+      "intro"
+    ],
+    "goal": "single-intro",
+    "from": "jill-rohit@jackandjill.ai → you, Nina",
+    "time": "06:12",
+    "subject": "Intro: Nina Patel for Senior Designer",
+    "preview": "AgentMail returned 503 on Intro Setter draft — send failed after approval.",
+    "tags": [
+      "Intro Setter"
+    ],
+    "userTags": [],
+    "blockReason": "failure",
+    "meta": {
+      "msgs": 3,
+      "status": "blocked — send failure",
+      "lastAction": "Intro Setter"
+    },
+    "messages": [
+      {
+        "from": "jill-rohit@jackandjill.ai → you, Nina Patel",
+        "time": "Yesterday",
+        "stage": "intro",
+        "body": "Rohit, meet Nina Patel — senior designer, ex-Notion."
+      },
+      {
+        "from": "you",
+        "time": "Yesterday",
+        "stage": "intro",
+        "body": "jill — intro Nina, propose times for next week."
+      },
+      {
+        "from": "jill-diy → you",
+        "time": "06:12",
+        "stage": "intro",
+        "agent": true,
+        "body": "Intro Setter drafted 3 slot options for Nina. You approved at 06:11, but AgentMail returned **503 Service Unavailable** on send.\n\nDraft is preserved. **Retry failed twice** — needs manual resend or support check.",
+        "caption": "Intro Setter · AgentMail 503 · 2 retries failed"
+      }
+    ]
   }
 ];
 
@@ -521,9 +728,15 @@ export const FOLDERS: Folder[] = [
     "section": "main"
   },
   {
+    "key": "blocked",
+    "label": "Blocked",
+    "count": 4,
+    "section": "main"
+  },
+  {
     "key": "all",
     "label": "All threads",
-    "count": 10,
+    "count": 14,
     "section": "main"
   },
   {
@@ -555,21 +768,21 @@ export const FOLDERS: Folder[] = [
   {
     "key": "stage_intro",
     "label": "Intro",
-    "count": 4,
+    "count": 6,
     "section": "stage",
     "stage": "intro"
   },
   {
     "key": "stage_takehome",
     "label": "Take-home",
-    "count": 2,
+    "count": 3,
     "section": "stage",
     "stage": "takehome"
   },
   {
     "key": "stage_codereview",
     "label": "Code review",
-    "count": 1,
+    "count": 2,
     "section": "stage",
     "stage": "codereview"
   },

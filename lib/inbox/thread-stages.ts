@@ -11,6 +11,12 @@ export const STAGE_LABELS: Record<PipelineStage, string> = {
   pmreview: "PM review",
 };
 
+export function getNextStage(stage: PipelineStage): PipelineStage | null {
+  const idx = STAGE_ORDER.indexOf(stage);
+  if (idx < 0 || idx >= STAGE_ORDER.length - 1) return null;
+  return STAGE_ORDER[idx + 1];
+}
+
 export interface IndexedMessage {
   message: ThreadMessage;
   index: number;

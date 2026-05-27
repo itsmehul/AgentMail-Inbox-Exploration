@@ -11,6 +11,7 @@ import {
 import type { ThreadMessage } from "@/lib/types";
 import { useFilteredThreads, useInboxStore } from "@/stores/inbox-store";
 import { ApprovalCard } from "./ApprovalCard";
+import { BlockedResolutionCard } from "./BlockedResolutionCard";
 import { CollapsedMessagesDivider } from "./CollapsedMessagesDivider";
 import { MessageBubble } from "./MessageBubble";
 import { StageScoreDialog } from "./StageScoreDialog";
@@ -60,8 +61,9 @@ export function ThreadDetail() {
     );
   }
 
-  const statusColor =
-    t.meta.status === "awaiting approval"
+  const statusColor = t.blockReason
+    ? "#dc2626"
+    : t.meta.status === "awaiting approval"
       ? "#ca8a04"
       : t.meta.status === "handed off" || t.meta.status === "archived"
         ? "var(--ink-muted)"
@@ -147,7 +149,13 @@ export function ThreadDetail() {
           const isExpanded = isLastStage || expandedStages.has(group.stage);
 
           if (isLastStage) {
-            return [...group.items].reverse().map(({ message, index }) => renderMessage(message, index, t.id));
+            const items = [...group.items]
+              .reverse()
+              .map(({ message, index }) => renderMessage(message, index, t.id));
+            if (t.blockReason) {
+              return [<BlockedResolutionCard key="blocked-resolution" thread={t} />, ...items];
+            }
+            return items;
           }
 
           const header = (

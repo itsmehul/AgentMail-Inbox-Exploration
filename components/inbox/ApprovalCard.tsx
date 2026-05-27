@@ -1,9 +1,18 @@
 "use client";
 
 import type { ThreadMessage } from "@/lib/types";
+import {
+  describeApprovalChanges,
+  getApprovalChanges,
+  normalizeAddrList,
+  type ApprovalSnapshot,
+} from "@/lib/inbox/approval-changes";
+import { getNextStage, STAGE_LABELS, type PipelineStage } from "@/lib/inbox/thread-stages";
 import { formatBody } from "@/lib/utils";
 import { useInboxStore } from "@/stores/inbox-store";
-import { useState } from "react";
+import { useMemoryStore } from "@/stores/memory-store";
+import { useEffect, useRef, useState } from "react";
+import { CommitMemoryDialog } from "./CommitMemoryDialog";
 
 const AVATAR_COLORS = ["#e8719a", "#7c9af2", "#6bc77a", "#f5a623", "#9b72cb", "#56c2c2"];
 
@@ -81,7 +90,19 @@ function RecipientRow({
 export function ApprovalCard({ message: m, threadId }: { message: ThreadMessage; threadId: string }) {
   const addAddr = useInboxStore((s) => s.addAddr);
   const removeAddr = useInboxStore((s) => s.removeAddr);
+  const promoteThreadStage = useInboxStore((s) => s.promoteThreadStage);
+  const commitApprovalEdit = useMemoryStore((s) => s.commitApprovalEdit);
   const [sent, setSent] = useState(false);
+  const [promoteOnSend, setPromoteOnSend] = useState(false);
+  const [memoryDialogOpen, setMemoryDialogOpen] = useState(false);
+  const [pendingChangeLabels, setPendingChangeLabels] = useState<string[]>([]);
+
+  const currentStage = (m.stage ?? "intro") as PipelineStage;
+  const nextStage = getNextStage(currentStage);
+
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const originalRef = useRef<ApprovalSnapshot | null>(null);
+  const pendingSnapshotRef = useRef<ApprovalSnapshot | null>(null);
 
   const toList = Array.isArray(m.to) ? m.to : m.to ? [m.to] : [];
   const ccList = Array.isArray(m.cc) ? m.cc : m.cc ? [m.cc] : [];
@@ -89,6 +110,63 @@ export function ApprovalCard({ message: m, threadId }: { message: ThreadMessage;
 
   const [showCc, setShowCc] = useState(ccList.length > 0);
   const [showBcc, setShowBcc] = useState(bccList.length > 0);
+
+  useEffect(() => {
+    originalRef.current = {
+      to: normalizeAddrList(m.to),
+      cc: normalizeAddrList(m.cc),
+      bcc: normalizeAddrList(m.bcc),
+      body: m.body ?? "",
+    };
+    setSent(false);
+    setPromoteOnSend(false);
+    setMemoryDialogOpen(false);
+  }, [threadId, m.when, m.body]);
+
+  const getCurrentSnapshot = (): ApprovalSnapshot => ({
+    to: [...toList],
+    cc: [...ccList],
+    bcc: [...bccList],
+    body: bodyRef.current?.innerText?.trim() ?? m.body ?? "",
+  });
+
+  const completeSend = (commitToMemory: boolean) => {
+    if (commitToMemory && pendingSnapshotRef.current) {
+      commitApprovalEdit({
+        threadId,
+        subagent: m.sub ?? "Subagent",
+        stage: m.stage,
+        snapshot: pendingSnapshotRef.current,
+      });
+    }
+    if (promoteOnSend && nextStage) {
+      promoteThreadStage(threadId, currentStage);
+    }
+    setMemoryDialogOpen(false);
+    pendingSnapshotRef.current = null;
+    setSent(true);
+  };
+
+  const handleSend = () => {
+    if (sent) return;
+    const original = originalRef.current;
+    if (!original) {
+      setSent(true);
+      return;
+    }
+
+    const current = getCurrentSnapshot();
+    const changes = getApprovalChanges(original, current);
+
+    if (changes.length === 0) {
+      setSent(true);
+      return;
+    }
+
+    pendingSnapshotRef.current = current;
+    setPendingChangeLabels(describeApprovalChanges(changes));
+    setMemoryDialogOpen(true);
+  };
 
   return (
     <div className="msg" style={{ borderBottom: "none", paddingBottom: 0, marginBottom: 0 }}>
@@ -142,6 +220,7 @@ export function ApprovalCard({ message: m, threadId }: { message: ThreadMessage;
         </div>
 
         <div
+          ref={bodyRef}
           className="approval-compose-body"
           contentEditable
           suppressContentEditableWarning
@@ -168,7 +247,7 @@ export function ApprovalCard({ message: m, threadId }: { message: ThreadMessage;
             type="button"
             className={`approval-compose-send${sent ? " sent" : ""}`}
             disabled={sent}
-            onClick={() => setSent(true)}
+            onClick={handleSend}
           >
             <span className="approval-compose-send-main">{sent ? "Sent" : "Send"}</span>
             {!sent ? (
@@ -252,8 +331,34 @@ export function ApprovalCard({ message: m, threadId }: { message: ThreadMessage;
           </button>
         </div>
 
+        {nextStage && !sent ? (
+          <div className="approval-compose-promote">
+            <label>
+              <input
+                type="checkbox"
+                className="checkbox"
+                checked={promoteOnSend}
+                onChange={(e) => setPromoteOnSend(e.target.checked)}
+              />
+              <span>Promote to {STAGE_LABELS[nextStage]}</span>
+            </label>
+          </div>
+        ) : null}
+
         {m.caption ? <div className="approval-compose-caption">{m.caption}</div> : null}
       </div>
+
+      <CommitMemoryDialog
+        open={memoryDialogOpen}
+        subagent={m.sub ?? "Subagent"}
+        changes={pendingChangeLabels}
+        onCancel={() => {
+          setMemoryDialogOpen(false);
+          pendingSnapshotRef.current = null;
+        }}
+        onSendWithoutSaving={() => completeSend(false)}
+        onSaveAndSend={() => completeSend(true)}
+      />
     </div>
   );
 }

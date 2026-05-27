@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { FOLDERS } from "@/lib/mock/inbox";
+import type { Folder } from "@/lib/types";
 import { useInboxStore } from "@/stores/inbox-store";
+import Link from "next/link";
 import { InboxToolbar } from "./InboxToolbar";
 import { ThreadDetail } from "./ThreadDetail";
 import { ThreadList } from "./ThreadList";
@@ -13,6 +14,27 @@ export function InboxPage() {
 
   const main = FOLDERS.filter((f) => f.section === "main");
   const stages = FOLDERS.filter((f) => f.section === "stage");
+  const chats = FOLDERS.filter((f) => f.section === "chat");
+
+  const renderFolder = (f: Folder) => (
+    <div
+      key={f.key}
+      className={`inbox-folder ${f.key === activeFolder ? "active" : ""}`}
+      onClick={() => setFolder(f.key)}
+      onKeyDown={(e) => e.key === "Enter" && setFolder(f.key)}
+      role="button"
+      tabIndex={0}
+    >
+      {f.label}
+      {f.badge ? (
+        <span className="badge-new" style={f.badgeColor ? { background: f.badgeColor } : undefined}>
+          {f.count}
+        </span>
+      ) : (
+        <span className="count">{f.count}</span>
+      )}
+    </div>
+  );
 
   return (
     <main className="canvas-area page active" id="page-inbox" style={{ overflow: "auto" }}>
@@ -31,39 +53,10 @@ export function InboxPage() {
         <div className="inbox-shell">
           <div className="inbox-sidebar" id="inbox-folders">
             <h4 style={{ marginTop: 6 }}>Folders</h4>
-            {main.map((f) => (
-              <div
-                key={f.key}
-                className={`inbox-folder ${f.key === activeFolder ? "active" : ""}`}
-                onClick={() => setFolder(f.key)}
-                onKeyDown={(e) => e.key === "Enter" && setFolder(f.key)}
-                role="button"
-                tabIndex={0}
-              >
-                {f.label}
-                {f.badge ? (
-                  <span className="badge-new" style={f.badgeColor ? { background: f.badgeColor } : undefined}>
-                    {f.count}
-                  </span>
-                ) : (
-                  <span className="count">{f.count}</span>
-                )}
-              </div>
-            ))}
+            {main.map(renderFolder)}
             <h4 style={{ marginTop: 14 }}>By stage</h4>
-            {stages.map((f) => (
-              <div
-                key={f.key}
-                className={`inbox-folder ${f.key === activeFolder ? "active" : ""}`}
-                onClick={() => setFolder(f.key)}
-                onKeyDown={(e) => e.key === "Enter" && setFolder(f.key)}
-                role="button"
-                tabIndex={0}
-              >
-                {f.label}
-                <span className="count">{f.count}</span>
-              </div>
-            ))}
+            {stages.map(renderFolder)}
+            {chats.map(renderFolder)}
           </div>
 
           <ThreadList />
