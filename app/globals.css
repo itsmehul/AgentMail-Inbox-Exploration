@@ -2526,6 +2526,48 @@ body[data-page="agent"] .app {
   color: #27272a;
 }
 
+.changes-help-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink-muted);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.changes-help-fab:hover {
+  background: var(--hover);
+  color: var(--ink);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.changes-help-list {
+  margin: 0;
+  padding: 0 0 0 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #27272a;
+}
+
+.changes-help-list li {
+  margin-bottom: 8px;
+}
+
+.changes-help-list li:last-child {
+  margin-bottom: 0;
+}
+
 .memory-dialog-changes li {
   margin-bottom: 4px;
 }
