@@ -158,6 +158,34 @@ function prospectFromPipeline(row: DbThreadRow | undefined): Prospect | null {
   }
 }
 
+export async function processJillWhisperCommand(
+  logicalThreadId: string,
+  role: "hm" | "eng",
+  body: string
+): Promise<{ ok: boolean; error?: string }> {
+  const pipeline = getThreadRowByLogicalId(logicalThreadId);
+
+  if (isHandedOff(pipeline)) {
+    if (role === "hm") {
+      return replyJillToHmOnly(logicalThreadId, HANDOFF_INACTIVE_REPLY);
+    }
+    return { ok: true };
+  }
+
+  const stage = currentPipelineStage(pipeline);
+  const action = parseJillCommand(body, stage);
+
+  if (action.type === "handoff" && role !== "hm") {
+    return { ok: true };
+  }
+
+  if (hasPendingApprovalDraft(logicalThreadId)) {
+    return { ok: false, error: PENDING_APPROVAL_ERROR };
+  }
+
+  return executeJillCommand(logicalThreadId, action, role);
+}
+
 export async function handleJillWhisper(
   message: AgentMail.Message,
   logicalThreadId: string,
@@ -167,27 +195,7 @@ export async function handleJillWhisper(
   if (!isStaffAddress(message.from ?? "")) return;
 
   const body = cleanEmailBody(message.text ?? message.extractedText ?? message.preview ?? "");
-  const pipeline = getThreadRowByLogicalId(logicalThreadId);
-
-  if (isHandedOff(pipeline)) {
-    if (role === "hm") {
-      await replyJillToHmOnly(logicalThreadId, HANDOFF_INACTIVE_REPLY);
-    }
-    return;
-  }
-
-  const stage = currentPipelineStage(pipeline);
-  const action = parseJillCommand(body, stage);
-
-  if (action.type === "handoff" && role !== "hm") {
-    return;
-  }
-
-  if (hasPendingApprovalDraft(logicalThreadId)) {
-    return;
-  }
-
-  await executeJillCommand(logicalThreadId, action, role);
+  await processJillWhisperCommand(logicalThreadId, role, body);
 }
 
 export async function retryJillCommandFromInstructions(
@@ -252,9 +260,7 @@ export async function sendRoleReply(input: {
     if (sent.messageId) {
       const full = await client.inboxes.messages.get(link.inbox_id, sent.messageId);
       persistAgentMailMessage(full, jillEmail, input.role);
-      if (isJillOnlyRecipient(full.to ?? [], jillEmail) && isStaffAddress(full.from ?? "")) {
-        await handleJillWhisper(full, input.logicalThreadId, input.role);
-      }
+      await processJillWhisperCommand(input.logicalThreadId, input.role, input.text);
     }
     broadcastInboxChanged("message_sent");
     return { messageId: sent.messageId, threadId: sent.threadId };

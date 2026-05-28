@@ -256,9 +256,11 @@ export function upsertThread(input: {
     existing?.candidate_email ??
     null;
   const stagesJson = input.stages ? JSON.stringify(input.stages) : existing?.stages_json ?? '["intro"]';
+  const pendingApproval =
+    logicalThreadId && !input.folder && !input.blockReason && hasPendingApprovalDraft(logicalThreadId);
   const folder =
     input.folder ??
-    (input.blockReason ? "blocked" : existing?.folder ?? "all");
+    (input.blockReason ? "blocked" : pendingApproval ? "approval" : existing?.folder ?? "all");
 
   db.prepare(
     `INSERT INTO threads (

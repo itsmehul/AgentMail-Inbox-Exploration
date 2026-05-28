@@ -14,7 +14,7 @@ import {
   defaultReplyRecipients,
 } from "@/lib/inbox/compose-recipients";
 import { JILL_COMMAND_HINTS } from "@/lib/inbox/jill-commands";
-import { findPendingApprovalMessage } from "@/lib/inbox/pending-approval";
+import { approvalVisibleToRole, findPendingApprovalMessage } from "@/lib/inbox/pending-approval";
 import type { Thread } from "@/lib/types";
 import { useInboxStore } from "@/stores/inbox-store";
 import { useMemoryStore } from "@/stores/memory-store";
@@ -45,7 +45,7 @@ export function ThreadCompose({ thread }: { thread: Thread }) {
   const commitApprovalEdit = useMemoryStore((s) => s.commitApprovalEdit);
 
   const approvalMsg = findPendingApprovalMessage(thread.messages);
-  const isApproval = thread.folder === "approval" && !!approvalMsg;
+  const isApproval = approvalVisibleToRole(thread, activeRole);
 
   const [mode, setMode] = useState<ComposeMode>("reply");
   const [text, setText] = useState("");

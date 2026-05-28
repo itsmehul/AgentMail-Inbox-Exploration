@@ -166,6 +166,11 @@ export function listThreadsFromDb(): Thread[] {
     const thread = threadBaseFromRow(primary, messageList);
     thread.id = logicalId;
     thread.meta.msgs = messageList.length;
+    if (draft) {
+      thread.folder = "approval";
+      thread.meta.status = "awaiting approval";
+      thread.meta.lastAction = draft.subagent;
+    }
     pipelineThreads.push(thread);
   }
 
