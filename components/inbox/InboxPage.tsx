@@ -4,6 +4,7 @@ import { computeFolders } from "@/lib/inbox/folders";
 import type { Folder } from "@/lib/types";
 import { useInboxStore } from "@/stores/inbox-store";
 import Link from "next/link";
+import { InboxResetButton } from "./InboxResetButton";
 import { InboxToolbar } from "./InboxToolbar";
 import { RoleSwitcher } from "./RoleSwitcher";
 import { ThreadDetail } from "./ThreadDetail";
@@ -106,6 +107,7 @@ export function InboxPage() {
           .
         </div>
       </div>
+      <InboxResetButton />
       <RoleSwitcher />
     </main>
   );

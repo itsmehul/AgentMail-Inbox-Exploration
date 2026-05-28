@@ -1,11 +1,11 @@
-import fs from "fs";
-import path from "path";
-import { Topbar } from "@/components/layout/Topbar";
-import { LeftNav } from "@/components/layout/LeftNav";
 import { AppGrid } from "@/components/layout/AppGrid";
 import { ChangesHelpButton } from "@/components/layout/ChangesHelpButton";
+import { LeftNav } from "@/components/layout/LeftNav";
+import { Topbar } from "@/components/layout/Topbar";
 import { CreateInboxModal } from "@/components/modals/CreateInboxModal";
 import { parseChangelogFromReadme } from "@/lib/changelog";
+import fs from "fs";
+import path from "path";
 
 function getChangelog() {
   const raw = fs.readFileSync(path.join(process.cwd(), "README.md"), "utf-8");
