@@ -99,8 +99,8 @@ export function InboxPage() {
 
         <div className="cache-note">
           <b>Unified AgentMail inbox</b> — Jill, HM, and Eng threads are merged into one view; messages always
-          come from AgentMail. Configure three webhooks (<code>?role=jill</code>, <code>?role=hm</code>,{" "}
-          <code>?role=eng</code>). HM/Eng use the role switcher and compose bar.{" "}
+          come from AgentMail. Configure one webhook at <code>/api/agentmail/webhooks</code>. HM/Eng use the
+          role switcher and compose bar.{" "}
           <Link href="/settings" style={{ color: "var(--zen)", textDecoration: "underline" }}>
             Settings
           </Link>

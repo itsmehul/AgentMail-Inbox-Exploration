@@ -153,14 +153,13 @@ export function SettingsPage() {
                 className="input"
                 defaultValue={
                   typeof window !== "undefined"
-                    ? `${window.location.origin}/api/agentmail/webhooks?role=jill`
-                    : "/api/agentmail/webhooks?role=jill"
+                    ? `${window.location.origin}/api/agentmail/webhooks`
+                    : "/api/agentmail/webhooks"
                 }
                 readOnly
               />
               <div style={{ fontSize: 11, color: "var(--ink-muted)", marginTop: 6, lineHeight: 1.5 }}>
-                Configure one webhook per inbox:{" "}
-                <code>?role=jill</code>, <code>?role=hm</code>, <code>?role=eng</code>
+                One webhook URL for all Jill, HM, and Eng inboxes.
               </div>
             </div>
             <div className="field">

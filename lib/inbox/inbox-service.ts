@@ -7,6 +7,9 @@ import {
   isJillAddress,
   parseEmailAddress,
   resolveAllRoleInboxes,
+  resolveInboxApiId,
+  roleForInboxKey,
+  roleForRecipientEmails,
   type RoleInbox,
 } from "@/lib/agentmail/config";
 import {
@@ -15,7 +18,7 @@ import {
   isBlockedRecipientError,
   unblockSendRecipient,
 } from "@/lib/agentmail/recipient-lists";
-import { normalizeWebhookEvent, type RawMessageReceivedEvent } from "@/lib/agentmail/webhook-normalize";
+import { normalizeWebhookEvent, type RawWebhookPayload } from "@/lib/agentmail/webhook-normalize";
 import {
   getFirstInboundMessage,
   isIntroSent,
@@ -39,8 +42,22 @@ import { isPipelineIntroSubject } from "@/lib/inbox/subject-match";
 import { broadcastInboxChanged } from "@/lib/inbox/sse-hub";
 import { threadHeaderFromMessage } from "@/lib/inbox/thread-mapper";
 
-function isInboundReceivedEvent(eventType: string): boolean {
-  return eventType === "message.received";
+function isProcessableWebhookEvent(eventType: string): boolean {
+  return eventType === "message.received" || eventType === "message.delivered";
+}
+
+function resolveInboxRole(
+  roles: Awaited<ReturnType<typeof resolveAllRoleInboxes>>,
+  message: AgentMail.Message,
+  deliveryRecipients?: string[]
+): RoleInbox {
+  if (deliveryRecipients?.length) {
+    const fromRecipients = roleForRecipientEmails(deliveryRecipients, roles);
+    if (fromRecipients) return fromRecipients;
+  }
+  const fromInbox = roleForInboxKey(String(message.inboxId), roles);
+  if (fromInbox) return fromInbox;
+  return "jill";
 }
 
 async function sendWithRecipientRetry<T>(
@@ -211,21 +228,19 @@ export async function maybeHandleFirstCandidateInbound(
   return true;
 }
 
-export async function handleMessageReceivedEvent(
-  event: {
-    event_type: string;
-    message: AgentMail.Message;
-    thread?: { messageCount?: number };
-  },
-  inboxRole?: RoleInbox
-) {
-  if (!isInboundReceivedEvent(event.event_type)) return;
+export async function handleMessageReceivedEvent(event: {
+  event_type: string;
+  message: AgentMail.Message;
+  thread?: { messageCount?: number };
+  deliveryRecipients?: string[];
+}) {
+  if (!isProcessableWebhookEvent(event.event_type)) return;
 
   const message = event.message;
   const jillEmail = getJillInboxEmail();
   const roles = await resolveAllRoleInboxes();
-  const role =
-    inboxRole ?? roles.find((r) => r.inboxId === String(message.inboxId))?.role ?? "jill";
+  const role = resolveInboxRole(roles, message, event.deliveryRecipients);
+  const isInboundReceived = event.event_type === "message.received";
 
   const persisted = persistAgentMailMessage(message, jillEmail, role);
 
@@ -264,11 +279,16 @@ export async function handleMessageReceivedEvent(
     return;
   }
 
-  if (role === "jill" && messageCount === 1 && !isIntroSent(threadId)) {
+  if (
+    isInboundReceived &&
+    role === "jill" &&
+    messageCount === 1 &&
+    !isIntroSent(threadId)
+  ) {
     await maybeHandleFirstCandidateInbound(threadId, inboxId, String(message.messageId));
   }
 
-  broadcastInboxChanged("message_received");
+  broadcastInboxChanged(isInboundReceived ? "message_received" : "message_delivered");
 }
 
 async function syncSingleInbox(inboxId: string, email: string, role: RoleInbox): Promise<number> {
@@ -364,10 +384,23 @@ export async function syncInboxFromAgentMail(): Promise<{ threadCount: number; s
   return { threadCount, synced };
 }
 
-export async function ingestWebhookPayload(payload: unknown, inboxRole?: RoleInbox) {
-  const event = normalizeWebhookEvent(payload as RawMessageReceivedEvent);
+export async function ingestWebhookPayload(payload: unknown) {
+  const event = normalizeWebhookEvent(payload as RawWebhookPayload);
   if (!markEventProcessed(event.event_id)) return;
-  await handleMessageReceivedEvent(event, inboxRole);
+
+  let message = event.message;
+  if (event.needsFetch && message.messageId) {
+    const inboxApiId = await resolveInboxApiId(String(message.inboxId));
+    const client = createAgentMailClient();
+    message = await client.inboxes.messages.get(inboxApiId, String(message.messageId));
+  }
+
+  await handleMessageReceivedEvent({
+    event_type: event.event_type,
+    message,
+    thread: event.thread,
+    deliveryRecipients: event.deliveryRecipients,
+  });
 }
 
 export { persistAgentMailMessage } from "@/lib/inbox/persist-message";

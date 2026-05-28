@@ -86,6 +86,47 @@ export async function resolveAllRoleInboxes(): Promise<
   ];
 }
 
+/** Match AgentMail inbox id (UUID) or inbox email address to a role. */
+export function roleForInboxKey(
+  key: string,
+  roles: { role: RoleInbox; inboxId: string; email: string }[]
+): RoleInbox | undefined {
+  const normalized = key.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return roles.find(
+    (r) => r.inboxId.toLowerCase() === normalized || r.email.toLowerCase() === normalized
+  )?.role;
+}
+
+/** Prefer HM/Eng when a delivery lists staff inboxes as recipients. */
+export function roleForRecipientEmails(
+  recipients: string[],
+  roles: { role: RoleInbox; inboxId: string; email: string }[]
+): RoleInbox | undefined {
+  const emails = recipients
+    .map((addr) => parseEmailAddress(addr).email)
+    .filter(Boolean);
+  for (const email of emails) {
+    const role = roleForInboxKey(email, roles);
+    if (role && role !== "jill") return role;
+  }
+  for (const email of emails) {
+    const role = roleForInboxKey(email, roles);
+    if (role) return role;
+  }
+  return undefined;
+}
+
+/** Webhooks may send inbox_id as email; API calls need the real inbox id. */
+export async function resolveInboxApiId(inboxKey: string): Promise<string> {
+  const key = inboxKey.trim();
+  if (key.includes("@")) {
+    const { inboxId } = await resolveInboxIdByEmail(key);
+    return inboxId;
+  }
+  return key;
+}
+
 export function isJillAddress(addr: string, jillEmail = getJillInboxEmail()): boolean {
   const parsed = parseEmailAddress(addr);
   return parsed.email.toLowerCase() === jillEmail;
