@@ -22,7 +22,11 @@ export function broadcastInboxChanged(reason = "inbox_changed") {
     try {
       client.enqueue(payload);
     } catch {
-      client.close();
+      try {
+        client.close();
+      } catch {
+        // ignore errors during close of already failed/closed clients
+      }
       clients.delete(client.id);
     }
   }
