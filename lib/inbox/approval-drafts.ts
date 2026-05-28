@@ -149,6 +149,14 @@ export async function stageCandidateApprovalDraft(
     lastAction: meta.subagent,
   });
 
+  if (kind === "codereview") {
+    try {
+      await ensurePipelineRoleLink(logicalThreadId, "eng");
+    } catch (error) {
+      console.warn(`Could not link eng inbox for pipeline ${logicalThreadId}:`, error);
+    }
+  }
+
   broadcastInboxChanged("approval_drafted");
   return { ok: true };
 }
@@ -202,6 +210,14 @@ export async function sendApprovedDraft(
     status: meta.status,
     lastAction: meta.lastAction,
   });
+
+  if (draft.target_stage === "codereview") {
+    try {
+      await ensurePipelineRoleLink(logicalThreadId, "eng");
+    } catch (error) {
+      console.warn(`Could not link eng inbox for pipeline ${logicalThreadId}:`, error);
+    }
+  }
 
   broadcastInboxChanged("approval_sent");
   return { ok: true };

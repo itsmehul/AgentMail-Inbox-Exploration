@@ -18,6 +18,7 @@ import {
   getInboxLinksForLogical,
   getLatestMessageForLogicalThread,
   getLatestMessageForThread,
+  getPendingApprovalDraft,
   getThreadRow,
   getThreadRowByLogicalId,
   upsertThread,
@@ -28,7 +29,29 @@ import {
 import { buildRoleInboxBootstrapBody } from "@/lib/inbox/intro-template";
 import { persistAgentMailMessage } from "@/lib/inbox/persist-message";
 import { isPipelineIntroSubject, subjectsMatchPipeline } from "@/lib/inbox/subject-match";
+import { STAGE_ORDER, type PipelineStage } from "@/lib/inbox/thread-stages";
 import { threadHeaderFromMessage } from "@/lib/inbox/thread-mapper";
+
+function pipelineHasReachedStage(stages: string[], minStage: PipelineStage): boolean {
+  const minIdx = STAGE_ORDER.indexOf(minStage);
+  if (minIdx < 0) return false;
+  return stages.some((stage) => {
+    const idx = STAGE_ORDER.indexOf(stage as PipelineStage);
+    return idx >= 0 && idx >= minIdx;
+  });
+}
+
+/** Eng inbox is linked only once the pipeline reaches code review (or a draft is pending for it). */
+export function engLinkingAllowed(logicalThreadId: string): boolean {
+  const pipeline = getThreadRowByLogicalId(logicalThreadId);
+  if (!pipeline) return false;
+
+  const stages = JSON.parse(pipeline.stages_json) as string[];
+  if (pipelineHasReachedStage(stages, "codereview")) return true;
+
+  const draft = getPendingApprovalDraft(logicalThreadId);
+  return draft?.target_stage === "codereview";
+}
 
 const THREAD_LIST_LIMIT = 100;
 
@@ -218,6 +241,10 @@ export async function ensurePipelineRoleLink(
   logicalThreadId: string,
   role: "jill" | "hm" | "eng"
 ): Promise<ThreadInboxLink | undefined> {
+  if (role === "eng" && !engLinkingAllowed(logicalThreadId)) {
+    return undefined;
+  }
+
   const pipeline = getThreadRowByLogicalId(logicalThreadId);
   if (!pipeline?.subject) return undefined;
 
