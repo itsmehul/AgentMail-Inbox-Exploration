@@ -1,0 +1,4 @@
+# better-sqlite3 compiles native bindings via node-gyp during pnpm install.
+[phases.setup]
+nixPkgs = ["...", "python3", "gcc", "gnumake"]
+aptPkgs = ["...", "build-essential"]
