@@ -22,9 +22,11 @@ import { normalizeWebhookEvent, type RawWebhookPayload } from "@/lib/agentmail/w
 import {
   findPipelineByCandidateEmail,
   getFirstInboundMessage,
+  isEventProcessed,
   isIntroSent,
   listPipelineLogicalIds,
   markEventProcessed,
+  releaseIntroProcessingClaim,
   setIntroSent,
   tryClaimIntroProcessing,
   upsertThread,
@@ -166,69 +168,74 @@ export async function maybeHandleFirstCandidateInbound(
   const introText = buildIntroBody(prospect);
   const introSubject = buildIntroSubject(prospect);
 
-  const ackSent = await sendAckReply(client, inboxId, triggerMessageId, sender.email, ackText);
-  if (ackSent.messageId) {
-    const ackFull = await client.inboxes.messages.get(inboxId, ackSent.messageId);
-    persistAgentMailMessage(ackFull, jillEmail, "jill");
-  }
+  try {
+    const ackSent = await sendAckReply(client, inboxId, triggerMessageId, sender.email, ackText);
+    if (ackSent.messageId) {
+      const ackFull = await client.inboxes.messages.get(inboxId, ackSent.messageId);
+      persistAgentMailMessage(ackFull, jillEmail, "jill");
+    }
 
-  const introSent = await sendNewIntroEmail(
-    client,
-    inboxId,
-    sender.email,
-    hmEmail,
-    introSubject,
-    introText
-  );
-
-  if (introSent.messageId) {
-    const introFull = await client.inboxes.messages.get(inboxId, introSent.messageId);
-    persistAgentMailMessage(introFull, jillEmail, "jill");
-
-    const logicalThreadId = pipelineLogicalId(String(introSent.threadId));
-    setIntroSent(threadId);
-
-    upsertThread({
-      threadId,
+    const introSent = await sendNewIntroEmail(
+      client,
       inboxId,
-      subject: inbound.subject,
-      preview: ackText.slice(0, 160),
-      fromDisplay: inbound.from_addr,
-      timeDisplay: inbound.time_display,
-      prospect,
-      introSent: true,
-      status: "ack sent",
-      lastAction: "Ack",
-      threadKind: "inbound",
-    });
+      sender.email,
+      hmEmail,
+      introSubject,
+      introText
+    );
 
-    upsertThread({
-      threadId: String(introSent.threadId),
-      inboxId,
-      subject: introSubject,
-      preview: introText.slice(0, 160),
-      fromDisplay: `${prospect.name} <${sender.email}>`,
-      timeDisplay: threadHeaderFromMessage(introFull).timeDisplay,
-      prospect,
-      logicalThreadId,
-      threadKind: "pipeline",
-      candidateEmail: sender.email,
-      status: "intro sent",
-      lastAction: "Intro-Setter",
-      stages: ["intro"],
-    });
+    if (introSent.messageId) {
+      const introFull = await client.inboxes.messages.get(inboxId, introSent.messageId);
+      persistAgentMailMessage(introFull, jillEmail, "jill");
 
-    upsertThreadInboxLink({
-      logical_thread_id: logicalThreadId,
-      inbox_id: inboxId,
-      thread_id: String(introSent.threadId),
-      role: "jill",
-    });
-  } else {
-    setIntroSent(threadId);
+      const logicalThreadId = pipelineLogicalId(String(introSent.threadId));
+      setIntroSent(threadId);
+
+      upsertThread({
+        threadId,
+        inboxId,
+        subject: inbound.subject,
+        preview: ackText.slice(0, 160),
+        fromDisplay: inbound.from_addr,
+        timeDisplay: inbound.time_display,
+        prospect,
+        introSent: true,
+        status: "ack sent",
+        lastAction: "Ack",
+        threadKind: "inbound",
+      });
+
+      upsertThread({
+        threadId: String(introSent.threadId),
+        inboxId,
+        subject: introSubject,
+        preview: introText.slice(0, 160),
+        fromDisplay: `${prospect.name} <${sender.email}>`,
+        timeDisplay: threadHeaderFromMessage(introFull).timeDisplay,
+        prospect,
+        logicalThreadId,
+        threadKind: "pipeline",
+        candidateEmail: sender.email,
+        status: "intro sent",
+        lastAction: "Intro-Setter",
+        stages: ["intro"],
+      });
+
+      upsertThreadInboxLink({
+        logical_thread_id: logicalThreadId,
+        inbox_id: inboxId,
+        thread_id: String(introSent.threadId),
+        role: "jill",
+      });
+    } else {
+      setIntroSent(threadId);
+    }
+
+    return true;
+  } catch (error) {
+    releaseIntroProcessingClaim(threadId);
+    throw error;
   }
-
-  return true;
 }
 
 export async function handleMessageReceivedEvent(event: {
@@ -389,11 +396,13 @@ export async function syncInboxFromAgentMail(): Promise<{ threadCount: number; s
 
 export async function ingestWebhookPayload(payload: unknown) {
   const event = normalizeWebhookEvent(payload as RawWebhookPayload);
-  if (!markEventProcessed(event.event_id)) return;
+  if (isEventProcessed(event.event_id)) return;
 
   let message = event.message;
+  const inboxApiId = await resolveInboxApiId(String(message.inboxId));
+  message = { ...message, inboxId: inboxApiId };
+
   if (event.needsFetch && message.messageId) {
-    const inboxApiId = await resolveInboxApiId(String(message.inboxId));
     const client = createAgentMailClient();
     message = await client.inboxes.messages.get(inboxApiId, String(message.messageId));
   }
@@ -404,6 +413,7 @@ export async function ingestWebhookPayload(payload: unknown) {
     thread: event.thread,
     deliveryRecipients: event.deliveryRecipients,
   });
+  markEventProcessed(event.event_id);
 }
 
 export { persistAgentMailMessage } from "@/lib/inbox/persist-message";

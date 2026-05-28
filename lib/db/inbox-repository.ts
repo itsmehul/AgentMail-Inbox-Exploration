@@ -68,12 +68,22 @@ export type ThreadInboxLink = {
   role: string;
 };
 
+export function isEventProcessed(eventId: string): boolean {
+  const existing = getDb()
+    .prepare("SELECT event_id FROM processed_events WHERE event_id = ?")
+    .get(eventId);
+  return Boolean(existing);
+}
+
 export function markEventProcessed(eventId: string): boolean {
   const db = getDb();
-  const existing = db.prepare("SELECT event_id FROM processed_events WHERE event_id = ?").get(eventId);
-  if (existing) return false;
+  if (isEventProcessed(eventId)) return false;
   db.prepare("INSERT INTO processed_events (event_id) VALUES (?)").run(eventId);
   return true;
+}
+
+export function unmarkEventProcessed(eventId: string) {
+  getDb().prepare("DELETE FROM processed_events WHERE event_id = ?").run(eventId);
 }
 
 export function getThreadRow(threadId: string): DbThreadRow | undefined {
@@ -100,6 +110,16 @@ export function tryClaimIntroProcessing(threadId: string): boolean {
     )
     .run(threadId);
   return result.changes > 0;
+}
+
+/** Undo a failed intro attempt so webhook retry or sync can run again. */
+export function releaseIntroProcessingClaim(threadId: string) {
+  getDb()
+    .prepare(
+      `UPDATE threads SET intro_sent = 0, status = 'received', last_action = 'Inbound email', updated_at = datetime('now')
+       WHERE thread_id = ? AND status = 'processing intro'`
+    )
+    .run(threadId);
 }
 
 export function setIntroSent(threadId: string) {
