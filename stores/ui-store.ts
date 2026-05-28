@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import type { InboxOption } from "@/lib/types";
 
 type CreateInboxStep = "form" | "loading" | "success";
 
@@ -13,7 +14,7 @@ interface UiState {
   createInboxDomain: string;
   createInboxError: string | null;
   domainPickerOpen: boolean;
-  pendingInboxAddr: string | null;
+  pendingCreatedInbox: InboxOption | null;
   setInboxDropdownOpen: (open: boolean) => void;
   openCreateInbox: () => void;
   closeCreateInbox: () => void;
@@ -21,20 +22,22 @@ interface UiState {
   setCreateInboxDisplay: (v: string) => void;
   setCreateInboxDomain: (domain: string) => void;
   setDomainPickerOpen: (open: boolean) => void;
-  submitCreateInbox: () => void;
-  finishCreateInbox: () => string | null;
+  setCreateInboxStep: (step: CreateInboxStep) => void;
+  setCreateInboxError: (error: string | null) => void;
+  setPendingCreatedInbox: (inbox: InboxOption | null) => void;
+  resetCreateInboxForm: () => void;
 }
 
-export const useUiStore = create<UiState>((set, get) => ({
+export const useUiStore = create<UiState>((set) => ({
   inboxDropdownOpen: false,
   createInboxOpen: false,
   createInboxStep: "form",
   createInboxUsername: "",
   createInboxDisplay: "",
-  createInboxDomain: "diy.ai",
+  createInboxDomain: "agentmail.to",
   createInboxError: null,
   domainPickerOpen: false,
-  pendingInboxAddr: null,
+  pendingCreatedInbox: null,
   setInboxDropdownOpen: (open) => set({ inboxDropdownOpen: open }),
   openCreateInbox: () =>
     set({
@@ -50,27 +53,16 @@ export const useUiStore = create<UiState>((set, get) => ({
   setCreateInboxDisplay: (v) => set({ createInboxDisplay: v }),
   setCreateInboxDomain: (domain) => set({ createInboxDomain: domain, domainPickerOpen: false }),
   setDomainPickerOpen: (open) => set({ domainPickerOpen: open }),
-  submitCreateInbox: () => {
-    const u = get().createInboxUsername.trim();
-    if (!u || !/^[a-z0-9][a-z0-9-]*$/i.test(u)) {
-      set({
-        createInboxError: "Username can only contain letters, numbers, and hyphens.",
-      });
-      return;
-    }
-    set({ createInboxStep: "loading", createInboxError: null });
-    const domain = get().createInboxDomain;
-    const addr = `${u}@${domain}`;
-    setTimeout(() => {
-      set({
-        createInboxStep: "success",
-        pendingInboxAddr: addr,
-      });
-    }, 1100);
-  },
-  finishCreateInbox: () => {
-    const addr = get().pendingInboxAddr;
-    set({ createInboxOpen: false, pendingInboxAddr: null });
-    return addr;
-  },
+  setCreateInboxStep: (createInboxStep) => set({ createInboxStep }),
+  setCreateInboxError: (createInboxError) => set({ createInboxError }),
+  setPendingCreatedInbox: (pendingCreatedInbox) => set({ pendingCreatedInbox }),
+  resetCreateInboxForm: () =>
+    set({
+      createInboxStep: "form",
+      createInboxUsername: "",
+      createInboxDisplay: "",
+      createInboxDomain: "agentmail.to",
+      createInboxError: null,
+      pendingCreatedInbox: null,
+    }),
 }));

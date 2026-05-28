@@ -1,5 +1,6 @@
 "use client";
 
+import { useAgentMailSync } from "@/components/settings/useAgentMailSync";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 
@@ -11,24 +12,57 @@ export function CreateInboxModal() {
   const createInboxDomain = useUiStore((s) => s.createInboxDomain);
   const createInboxError = useUiStore((s) => s.createInboxError);
   const domainPickerOpen = useUiStore((s) => s.domainPickerOpen);
-  const pendingInboxAddr = useUiStore((s) => s.pendingInboxAddr);
+  const pendingCreatedInbox = useUiStore((s) => s.pendingCreatedInbox);
+  const agentMailConnection = useSettingsStore((s) => s.agentMailConnection);
   const closeCreateInbox = useUiStore((s) => s.closeCreateInbox);
   const setCreateInboxUsername = useUiStore((s) => s.setCreateInboxUsername);
   const setCreateInboxDisplay = useUiStore((s) => s.setCreateInboxDisplay);
   const setCreateInboxDomain = useUiStore((s) => s.setCreateInboxDomain);
   const setDomainPickerOpen = useUiStore((s) => s.setDomainPickerOpen);
-  const submitCreateInbox = useUiStore((s) => s.submitCreateInbox);
-  const finishCreateInbox = useUiStore((s) => s.finishCreateInbox);
+  const setCreateInboxStep = useUiStore((s) => s.setCreateInboxStep);
+  const setCreateInboxError = useUiStore((s) => s.setCreateInboxError);
+  const setPendingCreatedInbox = useUiStore((s) => s.setPendingCreatedInbox);
   const addInbox = useSettingsStore((s) => s.addInbox);
+  const { provisionInbox } = useAgentMailSync();
 
   if (!createInboxOpen) return null;
 
   const username = createInboxUsername.trim() || "jill-eng";
   const display = createInboxDisplay.trim() || `${username} (engineering hiring assistant)`;
 
+  const handleCreate = async () => {
+    const u = createInboxUsername.trim();
+    if (!u || !/^[a-z0-9][a-z0-9-]*$/i.test(u)) {
+      setCreateInboxError("Username can only contain letters, numbers, and hyphens.");
+      return;
+    }
+    if (agentMailConnection === "not_configured") {
+      setCreateInboxError("Set AGENTMAIL_API_KEY in .env.local first (see env.example).");
+      return;
+    }
+
+    setCreateInboxStep("loading");
+    setCreateInboxError(null);
+
+    try {
+      const inbox = await provisionInbox({
+        username: u,
+        domain: createInboxDomain,
+        displayName: createInboxDisplay.trim() || undefined,
+      });
+      setPendingCreatedInbox(inbox);
+      setCreateInboxStep("success");
+    } catch (error) {
+      setCreateInboxStep("form");
+      setCreateInboxError(error instanceof Error ? error.message : "Failed to create inbox");
+    }
+  };
+
   const handleFinish = () => {
-    const addr = finishCreateInbox();
-    if (addr) addInbox(addr, display);
+    if (pendingCreatedInbox) addInbox(pendingCreatedInbox);
+    closeCreateInbox();
+    setPendingCreatedInbox(null);
+    setCreateInboxStep("form");
   };
 
   return (
@@ -74,6 +108,16 @@ export function CreateInboxModal() {
 
         {createInboxStep === "form" && (
           <div id="create-inbox-form" style={{ padding: "20px 24px" }}>
+            {agentMailConnection === "not_configured" ? (
+              <div style={{ fontSize: 12, color: "#a16207", background: "#fefce8", border: "1px solid #fde047", borderRadius: 8, padding: "10px 12px", marginBottom: 14 }}>
+                Add <code style={{ fontFamily: "var(--mono)" }}>AGENTMAIL_API_KEY</code> to <code style={{ fontFamily: "var(--mono)" }}>.env.local</code> (copy from{" "}
+                <code style={{ fontFamily: "var(--mono)" }}>env.example</code>). Get a key at{" "}
+                <a href="https://console.agentmail.to" target="_blank" rel="noreferrer" style={{ color: "var(--zen)" }}>
+                  console.agentmail.to
+                </a>
+                .
+              </div>
+            ) : null}
             <div className="field-grid" style={{ display: "grid", gap: 14 }}>
               <div className="field">
                 <label style={{ fontSize: 12, fontWeight: 500, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -92,11 +136,11 @@ export function CreateInboxModal() {
                     @{createInboxDomain}
                   </div>
                 </div>
-                {createInboxError && (
+                {createInboxError ? (
                   <div style={{ fontSize: 11, color: "#dc2626", marginTop: 6 }} id="username-error">
                     {createInboxError}
                   </div>
-                )}
+                ) : null}
               </div>
 
               <div className="field">
@@ -109,12 +153,15 @@ export function CreateInboxModal() {
                 <div className="select-box" onClick={() => setDomainPickerOpen(!domainPickerOpen)} role="button" tabIndex={0}>
                   <span id="domain-selected">
                     {createInboxDomain}{" "}
-                    <span style={{ color: "var(--ink-muted)", fontSize: 11, marginLeft: 6 }}>(verified custom domain)</span>
+                    <span style={{ color: "var(--ink-muted)", fontSize: 11, marginLeft: 6 }}>
+                      {createInboxDomain === "agentmail.to" ? "(shared default — fastest to start)" : "(custom domain)"}
+                    </span>
                   </span>
                 </div>
                 {domainPickerOpen && (
                   <div id="domain-options" style={{ marginTop: 4, border: "1px solid var(--border)", borderRadius: 8, padding: 4, background: "var(--panel)" }}>
                     {[
+                      ["agentmail.to", "(shared default — fastest to start)"],
                       ["diy.ai", "(verified custom domain)"],
                       ["zenlabs.ai", "(verified custom domain)"],
                     ].map(([dom, note]) => (
@@ -147,7 +194,7 @@ export function CreateInboxModal() {
               <button type="button" className="btn-soft" onClick={closeCreateInbox}>
                 Cancel
               </button>
-              <button type="button" className="btn-primary" id="create-inbox-btn" onClick={submitCreateInbox}>
+              <button type="button" className="btn-primary" id="create-inbox-btn" onClick={() => void handleCreate()}>
                 Create inbox
               </button>
             </div>
@@ -163,7 +210,7 @@ export function CreateInboxModal() {
           </div>
         )}
 
-        {createInboxStep === "success" && (
+        {createInboxStep === "success" && pendingCreatedInbox && (
           <div id="create-inbox-success" style={{ padding: "32px 24px" }}>
             <div style={{ textAlign: "center", marginBottom: 20 }}>
               <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#ecfdf5", display: "grid", placeItems: "center", margin: "0 auto 12px" }}>
@@ -173,18 +220,15 @@ export function CreateInboxModal() {
               </div>
               <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>Inbox created</div>
               <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 4 }} id="success-address">
-                {pendingInboxAddr} is ready to receive email
+                {pendingCreatedInbox.addr} is ready to receive email
               </div>
             </div>
             <div style={{ background: "var(--hover)", borderRadius: 8, padding: "12px 14px", fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink-muted)", lineHeight: 1.6 }}>
               <div>
-                <span style={{ color: "var(--ink)" }}>id:</span> ib_8a2f9c1d
+                <span style={{ color: "var(--ink)" }}>id:</span> {pendingCreatedInbox.inboxId}
               </div>
               <div>
-                <span style={{ color: "var(--ink)" }}>webhook:</span> subscribed ✓
-              </div>
-              <div>
-                <span style={{ color: "var(--ink)" }}>DKIM / SPF:</span> verified ✓
+                <span style={{ color: "var(--ink)" }}>address:</span> {pendingCreatedInbox.addr}
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>

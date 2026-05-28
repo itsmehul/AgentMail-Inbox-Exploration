@@ -2,11 +2,9 @@
 
 import { useInboxStore } from "@/stores/inbox-store";
 import { OrgUserMultiSelect } from "./OrgUserMultiSelect";
-import { SearchModeSelect } from "./SearchModeSelect";
 
 export function InboxToolbar() {
   const searchQuery = useInboxStore((s) => s.searchQuery);
-  const searchMode = useInboxStore((s) => s.searchMode);
   const setSearchQuery = useInboxStore((s) => s.setSearchQuery);
 
   return (
@@ -18,18 +16,13 @@ export function InboxToolbar() {
             <path d="M20 20L16 16" />
           </svg>
         </span>
-        <SearchModeSelect />
         <input
           type="search"
           className="inbox-search-input"
-          placeholder={
-            searchMode === "agent"
-              ? "Ask the agent to find, summarize, or act on emails…"
-              : "Search emails by sender, subject, preview, or tag…"
-          }
+          placeholder="Search emails by sender, subject, preview, or tag…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label={searchMode === "agent" ? "Ask the inbox agent" : "Search emails"}
+          aria-label="Search emails"
         />
         <OrgUserMultiSelect />
       </div>

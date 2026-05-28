@@ -38,8 +38,26 @@ export function BlockedResolutionCard({ thread }: { thread: Thread }) {
   const instructionsOnly = config.instructions && !config.wizard;
   const caption = `${blockReasonLabel(thread.blockReason)} · ${thread.meta.lastAction} · held`;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return;
+    if (thread.logicalThreadId && payload.instructions?.trim()) {
+      try {
+        const res = await fetch("/api/inbox/resolve-blocked", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            logicalThreadId: thread.logicalThreadId,
+            instructions: payload.instructions.trim(),
+          }),
+        });
+        if (!res.ok) {
+          const data = (await res.json()) as { error?: string };
+          throw new Error(data.error ?? "Failed to resolve");
+        }
+      } catch {
+        return;
+      }
+    }
     resolveBlockedThread(thread.id, payload);
     setResolved(true);
   };

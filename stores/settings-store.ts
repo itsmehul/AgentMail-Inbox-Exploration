@@ -1,33 +1,31 @@
 "use client";
 
 import { create } from "zustand";
-import type { ApprovalSubagent, InboxOption } from "@/lib/types";
+import type { InboxOption } from "@/lib/types";
 
-const DEFAULT_APPROVALS: ApprovalSubagent[] = [
-  { id: "Intro-Setter", name: "Intro-Setter", description: "opens new threads with candidates", requiresApproval: true },
-  { id: "TakeHome-Sender", name: "TakeHome-Sender", description: "attaches take-home material", requiresApproval: true },
-  { id: "CodeReview-Scheduler", name: "CodeReview-Scheduler", description: "loops in colleagues for code review", requiresApproval: true },
-  { id: "PMReview-Scheduler", name: "PMReview-Scheduler", description: "loops in PMs for product round", requiresApproval: true },
-  { id: "Status-Reporter", name: "Status-Reporter", description: "read-only summaries — only ever replies to you", requiresApproval: false },
-  { id: "Handoff", name: "Handoff", description: "brief recap, then exits the thread", requiresApproval: true },
-];
+export type AgentMailConnection = "unknown" | "not_configured" | "connected" | "error";
 
 interface SettingsState {
   selectedInbox: string;
+  selectedInboxId: string | null;
   inboxes: InboxOption[];
-  approvals: ApprovalSubagent[];
+  agentMailConnection: AgentMailConnection;
+  agentMailError: string | null;
+  agentMailInboxCount: number | null;
   saveVisible: boolean;
   reconcilerInterval: string;
   cacheTtl: string;
   guardianModel: string;
+  setAgentMailStatus: (status: AgentMailConnection, error?: string | null, inboxCount?: number | null) => void;
+  setInboxes: (inboxes: InboxOption[]) => void;
   setSelectedInbox: (addr: string) => void;
-  addInbox: (addr: string, display: string) => void;
-  toggleApproval: (id: string) => void;
+  addInbox: (inbox: InboxOption) => void;
+  getSelectedInboxId: () => string | null;
   showSaved: () => void;
   cycleReconciler: () => void;
   cycleCacheTtl: () => void;
   cycleGuardianModel: () => void;
-  getStagedStatusText: () => { text: string; color: string };
+  getAgentMailStatusLabel: () => string;
 }
 
 const RECONCILER_OPTIONS = [
@@ -49,40 +47,59 @@ const GUARDIAN_MODELS = ["Claude Haiku 4.5", "Claude Sonnet 4", "Claude Opus 4.7
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+const MOCK_INBOXES: InboxOption[] = [
+  {
+    inboxId: "mock_jill_hm",
+    addr: "jill-hm@diy.ai",
+    label: "jill-hm@diy.ai",
+    meta: "Demo · mock data until AgentMail is connected",
+    active: true,
+  },
+  {
+    inboxId: "mock_jill_test",
+    addr: "jill-test@diy.ai",
+    label: "jill-test@diy.ai",
+    meta: "Demo · mock data",
+  },
+];
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
-  selectedInbox: "jill-hm@diy.ai",
-  inboxes: [
-    { addr: "jill-hm@diy.ai", label: "jill-hm@diy.ai", meta: "Active · 38 threads · created Jan 14", active: true },
-    { addr: "jill-test@diy.ai", label: "jill-test@diy.ai", meta: "Sandbox · 4 threads · created Feb 2" },
-  ],
-  approvals: DEFAULT_APPROVALS,
+  selectedInbox: MOCK_INBOXES[0].addr,
+  selectedInboxId: MOCK_INBOXES[0].inboxId,
+  inboxes: MOCK_INBOXES,
+  agentMailConnection: "unknown",
+  agentMailError: null,
+  agentMailInboxCount: null,
   saveVisible: false,
   reconcilerInterval: "Every 60 seconds",
   cacheTtl: "24 hours (active) · 7 days (closed)",
   guardianModel: "Claude Haiku 4.5",
+  setAgentMailStatus: (agentMailConnection, agentMailError = null, agentMailInboxCount = null) => {
+    set({ agentMailConnection, agentMailError, agentMailInboxCount });
+  },
+  setInboxes: (inboxes) => {
+    const current = get().selectedInbox;
+    const match = inboxes.find((i) => i.addr === current) ?? inboxes[0];
+    set({
+      inboxes,
+      selectedInbox: match?.addr ?? current,
+      selectedInboxId: match?.inboxId ?? null,
+    });
+  },
   setSelectedInbox: (addr) => {
-    set({ selectedInbox: addr });
+    const inbox = get().inboxes.find((i) => i.addr === addr);
+    set({ selectedInbox: addr, selectedInboxId: inbox?.inboxId ?? null });
     get().showSaved();
   },
-  addInbox: (addr, display) => {
+  addInbox: (inbox) => {
     set((state) => ({
-      inboxes: [
-        ...state.inboxes,
-        { addr, label: addr, meta: `Active · 0 threads · just now`, active: true },
-      ],
-      selectedInbox: addr,
-    }));
-    get().showSaved();
-    void display;
-  },
-  toggleApproval: (id) => {
-    set((state) => ({
-      approvals: state.approvals.map((a) =>
-        a.id === id ? { ...a, requiresApproval: !a.requiresApproval } : a
-      ),
+      inboxes: [...state.inboxes.filter((i) => i.inboxId !== inbox.inboxId), inbox],
+      selectedInbox: inbox.addr,
+      selectedInboxId: inbox.inboxId,
     }));
     get().showSaved();
   },
+  getSelectedInboxId: () => get().selectedInboxId,
   showSaved: () => {
     set({ saveVisible: true });
     if (saveTimer) clearTimeout(saveTimer);
@@ -106,16 +123,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ guardianModel: GUARDIAN_MODELS[(idx + 1) % GUARDIAN_MODELS.length] });
     get().showSaved();
   },
-  getStagedStatusText: () => {
-    const { approvals } = get();
-    const onCount = approvals.filter((a) => a.requiresApproval).length;
-    const total = approvals.length;
-    if (onCount === 0) {
-      return { text: "● All subagents send directly — no approval needed", color: "#16a34a" };
+  getAgentMailStatusLabel: () => {
+    const { agentMailConnection, selectedInbox, agentMailError } = get();
+    if (agentMailConnection === "not_configured") {
+      return "Not configured · set AGENTMAIL_API_KEY in .env.local";
     }
-    return {
-      text: `● ${onCount} of ${total} subagents need your approval before sending`,
-      color: "#a16207",
-    };
+    if (agentMailConnection === "error") {
+      return `Connection error · ${agentMailError ?? "check API key"}`;
+    }
+    if (agentMailConnection === "connected") {
+      return `Connected · ${selectedInbox}`;
+    }
+    return "Checking connection…";
   },
 }));

@@ -30,6 +30,7 @@ export function useInboxUrlSync() {
   const skipUrlWrite = useRef(false);
   const hydrated = useRef(false);
 
+  const threads = useInboxStore((s) => s.threads);
   const activeFolder = useInboxStore((s) => s.activeFolder);
   const activeThread = useInboxStore((s) => s.activeThread);
   const searchQuery = useInboxStore((s) => s.searchQuery);
@@ -38,10 +39,10 @@ export function useInboxUrlSync() {
 
   useEffect(() => {
     const parsed = parseInboxSearchParams(searchParams);
-    const storeState = inboxStateFromStore(useInboxStore.getState());
+    const storeState = inboxStateFromStore(useInboxStore.getState(), threads);
 
     if (parsed) {
-      const resolved = resolveInboxUrlState(parsed);
+      const resolved = resolveInboxUrlState(parsed, threads);
       if (!inboxUrlStatesEqual(resolved, storeState)) {
         skipUrlWrite.current = true;
         applyUrlStateToStore(resolved);
@@ -50,8 +51,8 @@ export function useInboxUrlSync() {
       return;
     }
 
-    if (!hydrated.current) {
-      const initial = defaultInboxUrlState();
+    if (!hydrated.current && threads.length) {
+      const initial = defaultInboxUrlState(threads);
       if (!inboxUrlStatesEqual(initial, storeState)) {
         applyUrlStateToStore(initial);
       }
@@ -59,7 +60,7 @@ export function useInboxUrlSync() {
       router.replace(`${pathname}?${serializeInboxUrlState(initial)}`, { scroll: false });
       hydrated.current = true;
     }
-  }, [searchParams, pathname, router]);
+  }, [searchParams, pathname, router, threads]);
 
   useEffect(() => {
     if (skipUrlWrite.current) {
@@ -67,13 +68,16 @@ export function useInboxUrlSync() {
       return;
     }
 
-    const next = inboxStateFromStore({
-      activeFolder,
-      activeThread,
-      searchQuery,
-      searchMode,
-      selectedOrgUserIds,
-    });
+    const next = inboxStateFromStore(
+      {
+        activeFolder,
+        activeThread,
+        searchQuery,
+        searchMode,
+        selectedOrgUserIds,
+      },
+      threads
+    );
     const nextQuery = serializeInboxUrlState(next);
     const currentQuery = searchParams.toString();
 
@@ -89,5 +93,6 @@ export function useInboxUrlSync() {
     pathname,
     router,
     searchParams,
+    threads,
   ]);
 }

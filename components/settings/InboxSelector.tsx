@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAgentMailSync } from "@/components/settings/useAgentMailSync";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 
@@ -12,6 +13,22 @@ export function InboxSelector() {
   const setInboxDropdownOpen = useUiStore((s) => s.setInboxDropdownOpen);
   const openCreateInbox = useUiStore((s) => s.openCreateInbox);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const { refreshInboxes } = useAgentMailSync();
+
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const ok = await refreshInboxes();
+      if (!ok) setRefreshError("Could not refresh — check AgentMail connection");
+    } catch (error) {
+      setRefreshError(error instanceof Error ? error.message : "Refresh failed");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     const onClick = () => setInboxDropdownOpen(false);
@@ -105,11 +122,7 @@ export function InboxSelector() {
                 Create new inbox
               </div>
               <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRefreshing(true);
-                  setTimeout(() => setRefreshing(false), 700);
-                }}
+                onClick={(e) => void handleRefresh(e)}
                 role="button"
                 tabIndex={0}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6, cursor: "pointer", color: "var(--ink-muted)", fontSize: 12 }}
@@ -135,7 +148,10 @@ export function InboxSelector() {
           New inbox
         </button>
       </div>
-      <div className="helper-text">Inboxes are provisioned in AgentMail. Pick an existing one or create a new inbox below.</div>
+      <div className="helper-text">
+        Inboxes are provisioned in AgentMail. Pick an existing one or create a new inbox below.
+        {refreshError ? <span style={{ display: "block", color: "#dc2626", marginTop: 4 }}>{refreshError}</span> : null}
+      </div>
     </div>
   );
 }

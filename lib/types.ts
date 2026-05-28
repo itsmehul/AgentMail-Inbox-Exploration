@@ -51,6 +51,14 @@ export interface ThreadMeta {
   lastAction: string;
 }
 
+export interface Prospect {
+  name: string;
+  email: string;
+  role: string;
+  company: string;
+  stage: "intro";
+}
+
 export interface ThreadMessage {
   from?: string;
   time?: string;
@@ -66,6 +74,12 @@ export interface ThreadMessage {
   bcc?: string | string[];
   subjectLine?: string;
   attachment?: { name: string; size: string; tag?: string };
+  /** Jill-only whisper — visible in app, not sent to candidate. */
+  internal?: boolean;
+  /** Pending approval draft id (AgentMail live inbox). */
+  draftId?: string;
+  /** Role inbox that whispered to Jill when this draft was created. */
+  whispererRole?: "hm" | "eng" | "jill";
 }
 
 export type PipelineStageId = "intro" | "takehome" | "codereview" | "pmreview";
@@ -119,6 +133,12 @@ export interface Thread {
   stageScores?: StageScores;
   internalComments?: ThreadInternalComment[];
   messages: ThreadMessage[];
+  prospect?: Prospect;
+  candidateEmail?: string;
+  /** inbound = candidate→Jill ack thread; pipeline = merged hiring thread */
+  threadKind?: "inbound" | "pipeline";
+  logicalThreadId?: string;
+  inboxLinks?: { role: "jill" | "hm" | "eng"; inboxId: string; threadId: string }[];
 }
 
 export interface Folder {
@@ -162,6 +182,7 @@ export interface ApprovalSubagent {
 }
 
 export interface InboxOption {
+  inboxId: string;
   addr: string;
   label: string;
   meta: string;

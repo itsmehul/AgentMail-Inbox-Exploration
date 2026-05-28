@@ -2,25 +2,25 @@
 
 import { useMemo } from "react";
 import { create } from "zustand";
+import { fetchInboxThreads } from "@/lib/inbox/fetch-inbox";
 import { applyBlockedResolution, isBlockedThread } from "@/lib/inbox/blocked-threads";
+import { FOLDER_DEFS } from "@/lib/inbox/folders";
 import { getNextStage, STAGE_LABELS, type PipelineStage } from "@/lib/inbox/thread-stages";
 import { threadInvolvesAnyOrgUsers } from "@/lib/inbox/thread-org-users";
-import { FOLDERS, INBOX_THREADS } from "@/lib/mock/inbox";
 import { ORG_USERS } from "@/lib/mock/org-users";
 import type { BlockResolutionPayload, PipelineStageId, StageScoreEntry, Thread } from "@/lib/types";
 
 function threadsForFolder(key: string, threads: Thread[]): Thread[] {
-  const f = FOLDERS.find((x) => x.key === key);
+  const f = FOLDER_DEFS.find((x) => x.key === key);
   if (!f || key === "all") return threads;
   if (key === "blocked") return threads.filter(isBlockedThread);
   if (f.section === "stage") return threads.filter((t) => t.stages.includes(f.stage!));
   return threads.filter((t) => t.folder === key);
 }
 
-export type SearchMode = "query" | "agent";
+export type SearchMode = "query";
 
-function matchesSearch(thread: Thread, query: string, searchMode: SearchMode): boolean {
-  if (searchMode === "agent") return true;
+function matchesSearch(thread: Thread, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   const haystack = [
@@ -45,7 +45,7 @@ export function filterInboxThreads(
   searchMode: SearchMode = "query"
 ): Thread[] {
   return threadsForFolder(folder, threads)
-    .filter((t) => matchesSearch(t, searchQuery, searchMode))
+    .filter((t) => matchesSearch(t, searchQuery))
     .filter((t) => threadInvolvesAnyOrgUsers(t, selectedOrgUserIds, ORG_USERS));
 }
 
@@ -56,11 +56,16 @@ function pickActiveThread(current: string, filtered: Thread[]): string {
 
 interface InboxState {
   threads: Thread[];
+  loading: boolean;
+  error: string | null;
   activeFolder: string;
   activeThread: string;
   searchQuery: string;
   searchMode: SearchMode;
   selectedOrgUserIds: string[];
+  setThreads: (threads: Thread[]) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
   setFolder: (key: string) => void;
   setThread: (id: string) => void;
   setSearchQuery: (query: string) => void;
@@ -76,15 +81,28 @@ interface InboxState {
   updateStageScore: (threadId: string, stage: PipelineStageId, entry: StageScoreEntry) => void;
   resolveBlockedThread: (threadId: string, payload: BlockResolutionPayload) => void;
   promoteThreadStage: (threadId: string, fromStage: PipelineStageId) => void;
+  refreshThreads: () => Promise<void>;
 }
 
 export const useInboxStore = create<InboxState>((set, get) => ({
-  threads: INBOX_THREADS,
-  activeFolder: "approval",
-  activeThread: "thr_single_01",
+  threads: [],
+  loading: true,
+  error: null,
+  activeFolder: "all",
+  activeThread: "",
   searchQuery: "",
   searchMode: "query",
   selectedOrgUserIds: [],
+  setThreads: (threads) => {
+    const { activeFolder, searchQuery, searchMode, selectedOrgUserIds, activeThread } = get();
+    const filtered = filterInboxThreads(threads, activeFolder, searchQuery, selectedOrgUserIds, searchMode);
+    set({
+      threads,
+      activeThread: pickActiveThread(activeThread, filtered),
+    });
+  },
+  setLoading: (loading) => set({ loading }),
+  setError: (error) => set({ error }),
   setFolder: (key) => {
     const { threads, searchQuery, searchMode, selectedOrgUserIds, activeThread } = get();
     const filtered = filterInboxThreads(threads, key, searchQuery, selectedOrgUserIds, searchMode);
@@ -235,6 +253,10 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         };
       }),
     })),
+  refreshThreads: async () => {
+    const threads = await fetchInboxThreads();
+    get().setThreads(threads);
+  },
 }));
 
 export function useFilteredThreads(): Thread[] {

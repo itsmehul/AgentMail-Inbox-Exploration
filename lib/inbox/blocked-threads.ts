@@ -1,3 +1,4 @@
+import { JILL_COMMAND_HINTS } from "@/lib/inbox/jill-commands";
 import type {
   BlockReason,
   BlockedResolutionConfig,
@@ -160,14 +161,13 @@ export function getBlockedResolution(thread: Thread): BlockedResolutionConfig | 
 function fallbackResolution(reason: BlockReason): BlockedResolutionConfig {
   if (reason === "unclear_intent") {
     return {
-      title: "jill needs routing guidance",
-      description: "The orchestrator couldn't confidently delegate this reply.",
-      fixLink: { label: "Open Workflow", href: "/workflow" },
+      title: "Jill didn't understand the command",
+      description: `The message to Jill didn't match a known action. ${JILL_COMMAND_HINTS}`,
       instructions: {
-        placeholder: "Tell jill how to handle this thread…",
-        submitLabel: "Send instructions",
+        placeholder: 'Rephrase, e.g. "promote to take-home" or "handoff to HM"…',
+        submitLabel: "Send to Jill",
       },
-      submitLabel: "Unblock",
+      submitLabel: "Retry command",
     };
   }
 

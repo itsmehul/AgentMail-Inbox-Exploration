@@ -10,17 +10,15 @@ import {
 } from "@/lib/inbox/thread-stages";
 import type { ThreadMessage } from "@/lib/types";
 import { useFilteredThreads, useInboxStore } from "@/stores/inbox-store";
-import { ApprovalCard } from "./ApprovalCard";
 import { BlockedResolutionCard } from "./BlockedResolutionCard";
 import { CollapsedMessagesDivider } from "./CollapsedMessagesDivider";
 import { MessageBubble } from "./MessageBubble";
 import { StageScoreDialog } from "./StageScoreDialog";
 import { ThreadCommentsButton, ThreadCommentsPanel } from "./ThreadCommentsPanel";
+import { ThreadCompose } from "./ThreadCompose";
 
-function renderMessage(message: ThreadMessage, index: number, threadId: string) {
-  if (message.approval) {
-    return <ApprovalCard key={`msg-${index}`} message={message} threadId={threadId} />;
-  }
+function renderMessage(message: ThreadMessage, index: number) {
+  if (message.approval) return null;
   return <MessageBubble key={`msg-${index}`} message={message} />;
 }
 
@@ -37,7 +35,7 @@ export function ThreadDetail() {
   let t = threads.find((x) => x.id === activeThread);
   if (!t && threads.length) t = threads[0];
 
-  const threadId = t?.id;
+  const threadId = t?.id ?? "";
   const messageCount = t?.messages.length ?? 0;
 
   useEffect(() => {
@@ -87,7 +85,10 @@ export function ThreadDetail() {
   };
 
   return (
-    <div className={`thread-detail${commentsOpen ? " thread-detail-comments-open" : ""}`} id="thread-detail-content">
+    <div
+      className={`thread-detail${commentsOpen ? " thread-detail-comments-open" : ""}`}
+      id="thread-detail-content"
+    >
       <div className="thread-header">
         <div className="thread-header-top">
           <div className="thread-header-main">
@@ -95,15 +96,22 @@ export function ThreadDetail() {
             <div className="thread-detail-meta">
               <span>{t.id}</span>
               <span>{t.meta.msgs} messages</span>
+              {t.prospect && (
+                <span>
+                  {t.prospect.name} · {t.prospect.role} @ {t.prospect.company}
+                </span>
+              )}
               {avgScore != null && <span className="thread-avg-score">{formatStageScore(avgScore)}</span>}
               <span style={{ color: statusColor }}>{t.meta.status}</span>
             </div>
           </div>
-          <ThreadCommentsButton
-            count={(t.internalComments ?? []).length}
-            active={commentsOpen}
-            onClick={() => setCommentsOpen((open) => !open)}
-          />
+          <div className="thread-header-actions">
+            <ThreadCommentsButton
+              count={(t.internalComments ?? []).length}
+              active={commentsOpen}
+              onClick={() => setCommentsOpen((open) => !open)}
+            />
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--ink-muted)", marginRight: 4 }}>
@@ -151,7 +159,7 @@ export function ThreadDetail() {
           if (isLastStage) {
             const items = [...group.items]
               .reverse()
-              .map(({ message, index }) => renderMessage(message, index, t.id));
+              .map(({ message, index }) => renderMessage(message, index));
             if (t.blockReason) {
               return [<BlockedResolutionCard key="blocked-resolution" thread={t} />, ...items];
             }
@@ -178,11 +186,12 @@ export function ThreadDetail() {
 
           // Messages before header in DOM so column-reverse shows them below the divider.
           return [
-            ...[...group.items].reverse().map(({ message, index }) => renderMessage(message, index, t.id)),
+            ...[...group.items].reverse().map(({ message, index }) => renderMessage(message, index)),
             header,
           ];
         })}
       </div>
+      <ThreadCompose thread={t} />
       <ThreadCommentsPanel thread={t} open={commentsOpen} onClose={() => setCommentsOpen(false)} />
       {scoreDialogStage && t.stageScores?.[scoreDialogStage] && (
         <StageScoreDialog

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { InboxSelector } from "./InboxSelector";
+import { useAgentMailSync } from "./useAgentMailSync";
 
 function Tip({ text }: { text: string }) {
   return (
@@ -15,16 +16,25 @@ function Tip({ text }: { text: string }) {
 export function SettingsPage() {
   const saveVisible = useSettingsStore((s) => s.saveVisible);
   const showSaved = useSettingsStore((s) => s.showSaved);
-  const approvals = useSettingsStore((s) => s.approvals);
-  const toggleApproval = useSettingsStore((s) => s.toggleApproval);
-  const getStagedStatusText = useSettingsStore((s) => s.getStagedStatusText);
+  const agentMailConnection = useSettingsStore((s) => s.agentMailConnection);
+  const getAgentMailStatusLabel = useSettingsStore((s) => s.getAgentMailStatusLabel);
+  const { syncStatus, testConnection } = useAgentMailSync();
+  const [testing, setTesting] = useState(false);
+  const [testMessage, setTestMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    void syncStatus().then(() => {
+      if (useSettingsStore.getState().agentMailConnection === "connected") {
+        void testConnection();
+      }
+    });
+  }, [syncStatus, testConnection]);
   const reconcilerInterval = useSettingsStore((s) => s.reconcilerInterval);
   const cacheTtl = useSettingsStore((s) => s.cacheTtl);
   const guardianModel = useSettingsStore((s) => s.guardianModel);
   const cycleReconciler = useSettingsStore((s) => s.cycleReconciler);
   const cycleCacheTtl = useSettingsStore((s) => s.cycleCacheTtl);
   const cycleGuardianModel = useSettingsStore((s) => s.cycleGuardianModel);
-  const staged = getStagedStatusText();
 
   useEffect(() => {
     const handler = () => showSaved();
@@ -76,15 +86,43 @@ export function SettingsPage() {
             <div className="logo-am">AM</div>
             <div>
               <div className="settings-card-title">AgentMail</div>
-              <div className="settings-card-status">Connected · jill-hm@diy.ai</div>
+              <div
+                className="settings-card-status"
+                style={{
+                  color:
+                    agentMailConnection === "connected"
+                      ? undefined
+                      : agentMailConnection === "error"
+                        ? "#dc2626"
+                        : "#a16207",
+                }}
+              >
+                {getAgentMailStatusLabel()}
+              </div>
             </div>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-              <button type="button" className="btn-soft">
-                Test connection
-              </button>
-              <button type="button" className="btn-soft">
-                Disconnect
-              </button>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexDirection: "column", alignItems: "flex-end" }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn-soft"
+                  disabled={testing}
+                  onClick={async () => {
+                    setTesting(true);
+                    setTestMessage(null);
+                    const ok = await testConnection();
+                    setTestMessage(ok ? "Connection OK" : "Connection failed — see status");
+                    setTesting(false);
+                    showSaved();
+                  }}
+                >
+                  {testing ? "Testing…" : "Test connection"}
+                </button>
+              </div>
+              {testMessage ? (
+                <span style={{ fontSize: 11, color: testMessage.startsWith("Connection OK") ? "#16a34a" : "#dc2626" }}>
+                  {testMessage}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="settings-card-desc">
@@ -98,14 +136,32 @@ export function SettingsPage() {
                 API key
                 <Tip text="Your AgentMail API key. Used to send replies and pull thread state. Stored encrypted." />
               </label>
-              <input className="input" type="password" defaultValue="••••••••••••••••sk_live_8a2f" readOnly />
+              <input
+                className="input"
+                type="password"
+                value={agentMailConnection === "not_configured" ? "" : "••••••••••••••••"}
+                placeholder={agentMailConnection === "not_configured" ? "Set AGENTMAIL_API_KEY in .env.local" : undefined}
+                readOnly
+              />
             </div>
             <div className="field">
               <label>
                 Webhook URL
                 <Tip text="Where AgentMail sends inbound message events. Copy this into your AgentMail dashboard." />
               </label>
-              <input className="input" defaultValue="https://api.zenlabs.ai/webhooks/agentmail/jill-diy" readOnly />
+              <input
+                className="input"
+                defaultValue={
+                  typeof window !== "undefined"
+                    ? `${window.location.origin}/api/agentmail/webhooks?role=jill`
+                    : "/api/agentmail/webhooks?role=jill"
+                }
+                readOnly
+              />
+              <div style={{ fontSize: 11, color: "var(--ink-muted)", marginTop: 6, lineHeight: 1.5 }}>
+                Configure one webhook per inbox:{" "}
+                <code>?role=jill</code>, <code>?role=hm</code>, <code>?role=eng</code>
+              </div>
             </div>
             <div className="field">
               <label>
@@ -149,43 +205,6 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="settings-card" style={{ borderColor: "#fde047", background: "linear-gradient(180deg, #fefce8 0%, white 60px)" }}>
-          <div className="settings-card-head">
-            <div className="logo-am" style={{ background: "linear-gradient(135deg, #ca8a04, #eab308)" }}>
-              <svg style={{ width: 18, height: 18 }} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                <path d="M5 12l5 5L20 7" />
-              </svg>
-            </div>
-            <div>
-              <div className="settings-card-title">Approval before sending</div>
-              <div className="settings-card-status" style={{ color: staged.color }} id="staged-status-text">
-                {staged.text}
-              </div>
-            </div>
-          </div>
-          <div className="settings-card-desc">
-            For each subagent, choose whether jill-diy sends emails itself or waits for you to approve in the Inbox. <b>Tip:</b> start with everything needing approval and relax as you build confidence — usually over the first few weeks.
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }} id="approval-rows-container">
-            {approvals.map((row) => (
-              <div key={row.id} className="approval-row" data-sub={row.id}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{row.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--ink-muted)" }}>{row.description}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <label className="toggle">
-                    <input type="checkbox" checked={row.requiresApproval} onChange={() => toggleApproval(row.id)} />
-                    <span className="track" />
-                    <span className="knob" />
-                  </label>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         <div className="settings-card">
           <div className="settings-card-head">
             <div className="logo-am" style={{ background: "linear-gradient(135deg, #db2777, #ec4899)" }}>
@@ -196,7 +215,9 @@ export function SettingsPage() {
               <div className="settings-card-status">Pre-draft checks · applies to every subagent</div>
             </div>
           </div>
-          <div className="settings-card-desc">Every draft passes through Guardian before it&apos;s queued for approval (or sent, once a subagent is off staged approval).</div>
+          <div className="settings-card-desc">
+            Every candidate-facing draft passes through Guardian before it appears in the Inbox for your approval.
+          </div>
 
           <div className="field-grid">
             <div className="field">

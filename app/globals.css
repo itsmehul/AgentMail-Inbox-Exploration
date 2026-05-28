@@ -1763,6 +1763,13 @@ select {
   filter: brightness(0.95);
 }
 
+.thread-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .thread-header {
   padding: 18px 22px;
   border-bottom: 1px solid var(--border);
@@ -1918,6 +1925,25 @@ select {
   color: var(--ink-muted);
   font-weight: 400;
   font-family: var(--mono);
+}
+
+.msg-recipients {
+  font-size: 11px;
+  color: var(--ink-muted);
+  margin-bottom: 6px;
+  line-height: 1.45;
+}
+
+.msg-recipients-line + .msg-recipients-line {
+  margin-top: 2px;
+}
+
+.msg-recipients .lbl {
+  color: var(--zen);
+  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 10px;
+  margin-right: 6px;
 }
 
 .msg-body {
@@ -2769,4 +2795,254 @@ body[data-page="agent"] .app {
   color: var(--ink-muted);
   font-style: italic;
   text-align: center;
+}
+
+/* Role switcher (floating) */
+.role-switcher {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 50;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: white;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.role-switcher-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ink-muted);
+}
+
+.role-switcher-btn.active {
+  background: var(--zen);
+  color: white;
+}
+
+/* Thread compose */
+.thread-compose {
+  border-top: 1px solid var(--border);
+  padding: 12px 22px 16px;
+  background: #fafafa;
+}
+
+.thread-compose-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.thread-compose-tabs button {
+  border: 1px solid var(--border);
+  background: white;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ink-muted);
+}
+
+.thread-compose-tabs button.active {
+  border-color: var(--zen);
+  color: var(--zen);
+  background: var(--zen-bg);
+}
+
+.thread-compose-hint {
+  font-size: 11px;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+
+.thread-compose-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.thread-compose-role {
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.thread-compose-recipients {
+  margin: 0;
+}
+
+.thread-compose-input {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 72px;
+}
+
+.thread-compose-error {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #b91c1c;
+}
+
+.thread-compose-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.thread-compose-send {
+  background: var(--zen);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.thread-compose-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.thread-compose--approval {
+  background: #fefce8;
+  border-top: 1.5px solid #fde047;
+  border-left: 1.5px solid #fde047;
+  border-right: 1.5px solid #fde047;
+  border-bottom: none;
+  margin: 0 12px 12px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.thread-compose-approval-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.thread-compose-approval-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #854d0e;
+  background: #fef08a;
+  border: 1px solid #fde047;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.thread-compose-approval-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.thread-compose-approval-when {
+  font-size: 11px;
+  color: var(--ink-muted);
+  margin-left: auto;
+}
+
+.thread-compose--approval .thread-compose-input {
+  background: white;
+  border-color: #fde047;
+}
+
+.thread-compose--approval .thread-compose-input:focus {
+  outline: none;
+  border-color: #eab308;
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.15);
+}
+
+.thread-compose-cc-bcc {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.thread-compose-cc-bcc button {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.thread-compose-cc-bcc button:hover {
+  color: var(--ink);
+}
+
+.thread-compose-actions--approval {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.thread-compose-discard {
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.thread-compose-discard:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.thread-compose-discard:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.thread-compose-send--approval {
+  background: linear-gradient(135deg, #ca8a04, #eab308);
+}
+
+.thread-compose-send--approval:hover:not(:disabled) {
+  background: linear-gradient(135deg, #a16207, #ca8a04);
+}
+
+/* Internal Jill whisper messages */
+.msg.msg-internal {
+  border: 1px dashed #c4b5fd;
+  border-radius: 8px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: #faf5ff;
+}
+
+.msg-internal-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6d28d9;
+  background: #ede9fe;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
 }

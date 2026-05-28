@@ -1,22 +1,30 @@
 "use client";
 
-import { FOLDERS } from "@/lib/mock/inbox";
+import { computeFolders } from "@/lib/inbox/folders";
 import type { Folder } from "@/lib/types";
 import { useInboxStore } from "@/stores/inbox-store";
 import Link from "next/link";
 import { InboxToolbar } from "./InboxToolbar";
+import { RoleSwitcher } from "./RoleSwitcher";
 import { ThreadDetail } from "./ThreadDetail";
 import { ThreadList } from "./ThreadList";
+import { useInboxLiveSync } from "./useInboxLiveSync";
 import { useInboxUrlSync } from "./useInboxUrlSync";
 
 export function InboxPage() {
+  useInboxLiveSync();
   useInboxUrlSync();
+
+  const threads = useInboxStore((s) => s.threads);
+  const loading = useInboxStore((s) => s.loading);
+  const error = useInboxStore((s) => s.error);
   const activeFolder = useInboxStore((s) => s.activeFolder);
   const setFolder = useInboxStore((s) => s.setFolder);
 
-  const main = FOLDERS.filter((f) => f.section === "main");
-  const stages = FOLDERS.filter((f) => f.section === "stage");
-  const chats = FOLDERS.filter((f) => f.section === "chat");
+  const folders = computeFolders(threads);
+  const main = folders.filter((f) => f.section === "main");
+  const stages = folders.filter((f) => f.section === "stage");
+  const chats = folders.filter((f) => f.section === "chat");
 
   const renderFolder = (f: Folder) => (
     <div
@@ -46,9 +54,24 @@ export function InboxPage() {
             Inbox
           </h1>
           <div className="settings-sub" style={{ margin: "4px 0 0" }}>
-            Every thread jill-diy is part of, plus drafts awaiting your approval.
+            Multi-inbox hiring pipeline — ack + intro threads, HM/Eng compose, Jill whisper commands.
           </div>
         </div>
+
+        {error && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "rgba(220,38,38,0.08)",
+              color: "#b91c1c",
+              fontSize: 13,
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         <InboxToolbar />
 
@@ -61,18 +84,29 @@ export function InboxPage() {
             {chats.map(renderFolder)}
           </div>
 
-          <ThreadList />
-          <ThreadDetail />
+          {loading && threads.length === 0 ? (
+            <div style={{ flex: 1, padding: 32, color: "var(--ink-muted)", fontSize: 13 }}>
+              Syncing inbox from AgentMail…
+            </div>
+          ) : (
+            <>
+              <ThreadList />
+              <ThreadDetail />
+            </>
+          )}
         </div>
 
         <div className="cache-note">
-          <b>5 subagents currently need your approval</b> before sending — drafts from Intro-Setter, TakeHome-Sender, CodeReview-Scheduler, PMReview-Scheduler, and Handoff all land here first. Approve to send via AgentMail; edit to tweak before sending; discard to drop. Manage which subagents need approval in{" "}
+          <b>AgentMail live inbox</b> — configure three webhooks (
+          <code>?role=jill</code>, <code>?role=hm</code>, <code>?role=eng</code>). First candidate email gets an ack
+          on thread 1 and a new intro thread. HM/Eng use the role switcher and compose bar.{" "}
           <Link href="/settings" style={{ color: "var(--zen)", textDecoration: "underline" }}>
-            Settings → Approval before sending
+            Settings
           </Link>
           .
         </div>
       </div>
+      <RoleSwitcher />
     </main>
   );
 }
