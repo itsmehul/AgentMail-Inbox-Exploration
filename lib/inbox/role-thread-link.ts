@@ -1,23 +1,92 @@
+import type { AgentMail } from "agentmail";
 import { createAgentMailClient } from "@/lib/agentmail/client";
 import {
   getEngEmail,
   getHmEmail,
   getJillInboxEmail,
+  parseEmailAddress,
   resolveInboxIdByEmail,
   type RoleInbox,
 } from "@/lib/agentmail/config";
 import {
+  blockedRecipientFromError,
+  ensureSendAllowed,
+  isBlockedRecipientError,
+  unblockSendRecipient,
+} from "@/lib/agentmail/recipient-lists";
+import {
   getInboxLinksForLogical,
+  getLatestMessageForLogicalThread,
   getLatestMessageForThread,
   getThreadRow,
   getThreadRowByLogicalId,
   upsertThread,
   upsertThreadInboxLink,
+  type DbThreadRow,
   type ThreadInboxLink,
 } from "@/lib/db/inbox-repository";
+import { buildIntroBody } from "@/lib/inbox/intro-template";
 import { persistAgentMailMessage } from "@/lib/inbox/persist-message";
 import { isPipelineIntroSubject, subjectsMatchPipeline } from "@/lib/inbox/subject-match";
 import { threadHeaderFromMessage } from "@/lib/inbox/thread-mapper";
+import type { Prospect } from "@/lib/types";
+
+const THREAD_LIST_LIMIT = 100;
+
+async function sendWithAllowlistRetry<T>(
+  client: ReturnType<typeof createAgentMailClient>,
+  inboxId: string,
+  sendFn: () => Promise<T>
+): Promise<T> {
+  try {
+    return await sendFn();
+  } catch (error) {
+    if (!isBlockedRecipientError(error)) throw error;
+    const blocked = blockedRecipientFromError(error);
+    if (blocked) {
+      await unblockSendRecipient(client, inboxId, blocked);
+      return sendFn();
+    }
+    throw error;
+  }
+}
+
+function prospectFromPipeline(row: DbThreadRow): Prospect | null {
+  if (!row.prospect_json) return null;
+  try {
+    return JSON.parse(row.prospect_json) as Prospect;
+  } catch {
+    return null;
+  }
+}
+
+function collectParticipantEmails(messages: AgentMail.Message[]): Set<string> {
+  const participants = new Set<string>();
+  for (const message of messages) {
+    if (message.from) {
+      const email = parseEmailAddress(String(message.from)).email;
+      if (email) participants.add(email);
+    }
+    for (const addr of message.to ?? []) {
+      const email = parseEmailAddress(String(addr)).email;
+      if (email) participants.add(email);
+    }
+    for (const addr of message.cc ?? []) {
+      const email = parseEmailAddress(String(addr)).email;
+      if (email) participants.add(email);
+    }
+  }
+  return participants;
+}
+
+function getJillThreadForPipeline(
+  logicalThreadId: string,
+  pipeline: DbThreadRow
+): { inboxId: string; threadId: string } | undefined {
+  const link = getInboxLinksForLogical(logicalThreadId).find((l) => l.role === "jill");
+  if (link) return { inboxId: link.inbox_id, threadId: link.thread_id };
+  return { inboxId: pipeline.inbox_id, threadId: pipeline.thread_id };
+}
 
 async function syncRoleThread(
   logicalThreadId: string,
@@ -59,6 +128,92 @@ async function syncRoleThread(
   return link;
 }
 
+async function findMatchingRoleThreadInInbox(
+  client: ReturnType<typeof createAgentMailClient>,
+  inboxId: string,
+  introSubject: string,
+  candidateEmail?: string
+): Promise<string | undefined> {
+  const listed = await client.inboxes.threads.list(inboxId, { limit: THREAD_LIST_LIMIT });
+  for (const item of listed.threads) {
+    const full = await client.inboxes.threads.get(inboxId, item.threadId);
+    const subject = full.subject ?? "";
+
+    if (subjectsMatchPipeline(introSubject, subject)) {
+      return String(full.threadId);
+    }
+
+    if (candidateEmail && isPipelineIntroSubject(subject)) {
+      const participants = collectParticipantEmails(full.messages);
+      if (participants.has(candidateEmail)) {
+        return String(full.threadId);
+      }
+    }
+  }
+  return undefined;
+}
+
+async function bootstrapPipelineRoleLink(
+  logicalThreadId: string,
+  role: "hm" | "eng",
+  pipeline: DbThreadRow,
+  introSubject: string,
+  roleInboxId: string
+): Promise<ThreadInboxLink | undefined> {
+  const jillThread = getJillThreadForPipeline(logicalThreadId, pipeline);
+  if (!jillThread) return undefined;
+
+  const client = createAgentMailClient();
+  const jillEmail = getJillInboxEmail();
+  const roleEmail = role === "hm" ? getHmEmail() : getEngEmail();
+  const latest =
+    getLatestMessageForLogicalThread(logicalThreadId, "jill") ??
+    getLatestMessageForThread(jillThread.threadId);
+  if (!latest) return undefined;
+
+  const candidateEmail = pipeline.candidate_email?.toLowerCase();
+  const to = candidateEmail ? [roleEmail, candidateEmail] : [roleEmail];
+  for (const addr of to) {
+    await ensureSendAllowed(client, jillThread.inboxId, addr);
+  }
+
+  const prospect = prospectFromPipeline(pipeline);
+  const text = prospect
+    ? buildIntroBody(prospect)
+    : "Looping you into this hiring pipeline thread.\n\n— jill-diy";
+
+  try {
+    const sent = await sendWithAllowlistRetry(client, jillThread.inboxId, () =>
+      client.inboxes.messages.reply(jillThread.inboxId, latest.message_id, {
+        to: to.length === 1 ? to[0] : to,
+        text,
+      })
+    );
+
+    if (sent.messageId) {
+      const full = await client.inboxes.messages.get(jillThread.inboxId, sent.messageId);
+      persistAgentMailMessage(full, jillEmail, "jill");
+    }
+  } catch (error) {
+    console.warn(`Could not bootstrap ${role} thread for pipeline ${logicalThreadId}:`, error);
+    return undefined;
+  }
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const matchedThreadId = await findMatchingRoleThreadInInbox(
+      client,
+      roleInboxId,
+      introSubject,
+      candidateEmail ?? undefined
+    );
+    if (matchedThreadId) {
+      return syncRoleThread(logicalThreadId, role, roleInboxId, matchedThreadId, introSubject);
+    }
+  }
+
+  return undefined;
+}
+
 export async function ensurePipelineRoleLink(
   logicalThreadId: string,
   role: "jill" | "hm" | "eng"
@@ -83,30 +238,27 @@ export async function ensurePipelineRoleLink(
     }
   }
 
+  if (role === "jill") {
+    const { inboxId: jillInboxId } = await resolveInboxIdByEmail(getJillInboxEmail());
+    if (pipeline.inbox_id === jillInboxId) {
+      return syncRoleThread(logicalThreadId, "jill", pipeline.inbox_id, pipeline.thread_id, introSubject);
+    }
+  }
+
   const client = createAgentMailClient();
   const candidateEmail = pipeline.candidate_email?.toLowerCase();
+  const matchedThreadId = await findMatchingRoleThreadInInbox(
+    client,
+    inboxId,
+    introSubject,
+    candidateEmail ?? undefined
+  );
+  if (matchedThreadId) {
+    return syncRoleThread(logicalThreadId, role, inboxId, matchedThreadId, introSubject);
+  }
 
-  const listed = await client.inboxes.threads.list(inboxId, { limit: 50 });
-  for (const item of listed.threads) {
-    const full = await client.inboxes.threads.get(inboxId, item.threadId);
-    const subject = full.subject ?? "";
-
-    if (subjectsMatchPipeline(introSubject, subject)) {
-      return syncRoleThread(logicalThreadId, role, inboxId, String(full.threadId), introSubject);
-    }
-
-    if (candidateEmail && isPipelineIntroSubject(subject)) {
-      const participants = new Set<string>();
-      for (const message of full.messages) {
-        if (message.from) participants.add(message.from.toLowerCase());
-        for (const addr of message.to ?? []) participants.add(String(addr).toLowerCase());
-        for (const addr of message.cc ?? []) participants.add(String(addr).toLowerCase());
-      }
-      const hasCandidate = [...participants].some((addr) => addr.includes(candidateEmail));
-      if (hasCandidate) {
-        return syncRoleThread(logicalThreadId, role, inboxId, String(full.threadId), introSubject);
-      }
-    }
+  if (role === "hm" || role === "eng") {
+    return bootstrapPipelineRoleLink(logicalThreadId, role, pipeline, introSubject, inboxId);
   }
 
   return undefined;

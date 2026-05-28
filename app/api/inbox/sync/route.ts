@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { agentMailErrorResponse, agentMailRouteGuard } from "@/lib/agentmail/api-route";
 import { isAgentMailConfigured } from "@/lib/agentmail/client";
 import { getJillInboxEmail, getHmEmail } from "@/lib/agentmail/config";
+import { listUnifiedInboxFromAgentMail } from "@/lib/inbox/agentmail-inbox";
 import { syncInboxFromAgentMail } from "@/lib/inbox/inbox-service";
-import { listThreadsFromDb } from "@/lib/inbox/thread-mapper";
 
 function configError(): NextResponse | null {
   if (!isAgentMailConfigured()) {
@@ -32,7 +32,7 @@ export async function POST() {
 
   try {
     const result = await syncInboxFromAgentMail();
-    const threads = listThreadsFromDb();
+    const threads = await listUnifiedInboxFromAgentMail();
     return NextResponse.json({ ...result, threads, count: threads.length });
   } catch (error) {
     return agentMailErrorResponse(error);

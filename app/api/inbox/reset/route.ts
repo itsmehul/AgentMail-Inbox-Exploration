@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { agentMailErrorResponse, agentMailRouteGuard } from "@/lib/agentmail/api-route";
 import { clearAgentMailAndLocalDb } from "@/lib/inbox/clear-inbox";
 import { broadcastInboxChanged } from "@/lib/inbox/sse-hub";
-import { listThreadsFromDb } from "@/lib/inbox/thread-mapper";
+import { listUnifiedInboxFromAgentMail } from "@/lib/inbox/agentmail-inbox";
 
 export async function POST() {
   const guard = agentMailRouteGuard();
@@ -11,7 +11,7 @@ export async function POST() {
   try {
     const result = await clearAgentMailAndLocalDb();
     broadcastInboxChanged("inbox_reset");
-    const threads = listThreadsFromDb();
+    const threads = await listUnifiedInboxFromAgentMail();
     return NextResponse.json({ ...result, threads, count: threads.length });
   } catch (error) {
     return agentMailErrorResponse(error);

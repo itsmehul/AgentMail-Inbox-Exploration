@@ -55,7 +55,7 @@ export function InboxPage() {
             Inbox
           </h1>
           <div className="settings-sub" style={{ margin: "4px 0 0" }}>
-            Multi-inbox hiring pipeline — ack + intro threads, HM/Eng compose, Jill whisper commands.
+            Unified inbox across Jill, HM, and Eng — live from AgentMail with pipeline threads merged by candidate.
           </div>
         </div>
 
@@ -87,7 +87,7 @@ export function InboxPage() {
 
           {loading && threads.length === 0 ? (
             <div style={{ flex: 1, padding: 32, color: "var(--ink-muted)", fontSize: 13 }}>
-              Syncing inbox from AgentMail…
+              Loading unified inbox from AgentMail…
             </div>
           ) : (
             <>
@@ -98,9 +98,9 @@ export function InboxPage() {
         </div>
 
         <div className="cache-note">
-          <b>AgentMail live inbox</b> — configure three webhooks (
-          <code>?role=jill</code>, <code>?role=hm</code>, <code>?role=eng</code>). First candidate email gets an ack
-          on thread 1 and a new intro thread. HM/Eng use the role switcher and compose bar.{" "}
+          <b>Unified AgentMail inbox</b> — Jill, HM, and Eng threads are merged into one view; messages always
+          come from AgentMail. Configure three webhooks (<code>?role=jill</code>, <code>?role=hm</code>,{" "}
+          <code>?role=eng</code>). HM/Eng use the role switcher and compose bar.{" "}
           <Link href="/settings" style={{ color: "var(--zen)", textDecoration: "underline" }}>
             Settings
           </Link>
