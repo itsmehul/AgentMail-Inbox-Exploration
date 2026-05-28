@@ -1,6 +1,5 @@
 import { isBlockedThread } from "@/lib/inbox/blocked-threads";
 import { FOLDER_KEYS } from "@/lib/inbox/folders";
-import { findThreadByAnyId, resolveMergedThreadId } from "@/lib/inbox/resolve-merged-thread";
 import type { Thread } from "@/lib/types";
 import type { SearchMode } from "@/stores/inbox-store";
 import { filterInboxThreads } from "@/stores/inbox-store";
@@ -24,10 +23,9 @@ export interface InboxUrlState {
 const DEFAULT_FOLDER = "all";
 const VALID_MODES: SearchMode[] = ["query"];
 
-function pickActiveThread(current: string, filtered: Thread[], allThreads: Thread[]): string {
-  const canonical = resolveMergedThreadId(current, allThreads);
-  if (canonical && filtered.some((t) => t.id === canonical)) return canonical;
-  return filtered[0]?.id ?? canonical ?? current;
+function pickActiveThread(current: string, filtered: Thread[]): string {
+  if (current && filtered.some((t) => t.id === current)) return current;
+  return filtered[0]?.id ?? current;
 }
 
 export function defaultFolderForThread(thread: Thread): string {
@@ -63,8 +61,7 @@ export function parseInboxSearchParams(params: URLSearchParams): InboxUrlState |
 }
 
 export function resolveInboxUrlState(partial: InboxUrlState, threads: Thread[]): InboxUrlState {
-  const canonicalThread = resolveMergedThreadId(partial.thread, threads);
-  const threadRow = findThreadByAnyId(threads, partial.thread);
+  const threadRow = threads.find((t) => t.id === partial.thread);
   let folder = partial.folder;
 
   if (threadRow) {
@@ -75,7 +72,7 @@ export function resolveInboxUrlState(partial: InboxUrlState, threads: Thread[]):
       partial.selectedOrgUserIds,
       partial.searchMode
     );
-    if (!filteredWithFolder.some((t) => t.id === canonicalThread)) {
+    if (!filteredWithFolder.some((t) => t.id === partial.thread)) {
       folder = defaultFolderForThread(threadRow);
     }
   }
@@ -91,7 +88,7 @@ export function resolveInboxUrlState(partial: InboxUrlState, threads: Thread[]):
   return {
     ...partial,
     folder,
-    thread: pickActiveThread(canonicalThread, filtered, threads),
+    thread: pickActiveThread(partial.thread, filtered),
   };
 }
 

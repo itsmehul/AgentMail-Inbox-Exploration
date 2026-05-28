@@ -18,7 +18,6 @@ import {
 } from "@/lib/db/inbox-repository";
 import { approvalMessageFromDraft } from "@/lib/inbox/approval-drafts";
 import { pipelineLogicalId, resolveLogicalThreadForMessage } from "@/lib/inbox/pipeline-link";
-import { preferMergedThreadList } from "@/lib/inbox/resolve-merged-thread";
 import { isPipelineIntroSubject, normalizeEmailSubject } from "@/lib/inbox/subject-match";
 import {
   agentMailMessageToUpsert,
@@ -318,5 +317,5 @@ export async function listUnifiedInboxFromAgentMail(): Promise<Thread[]> {
 
   const combined = [...pipelineThreads, ...inboundThreads];
   combined.sort((a, b) => b.time.localeCompare(a.time));
-  return preferMergedThreadList(combined);
+  return combined;
 }

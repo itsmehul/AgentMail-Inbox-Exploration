@@ -5,7 +5,6 @@ import { create } from "zustand";
 import { fetchInboxThreads } from "@/lib/inbox/fetch-inbox";
 import { applyBlockedResolution, isBlockedThread } from "@/lib/inbox/blocked-threads";
 import { FOLDER_DEFS } from "@/lib/inbox/folders";
-import { resolveMergedThreadId } from "@/lib/inbox/resolve-merged-thread";
 import { getNextStage, STAGE_LABELS, type PipelineStage } from "@/lib/inbox/thread-stages";
 import { threadInvolvesAnyOrgUsers } from "@/lib/inbox/thread-org-users";
 import { ORG_USERS } from "@/lib/mock/org-users";
@@ -50,10 +49,9 @@ export function filterInboxThreads(
     .filter((t) => threadInvolvesAnyOrgUsers(t, selectedOrgUserIds, ORG_USERS));
 }
 
-function pickActiveThread(current: string, filtered: Thread[], allThreads: Thread[]): string {
-  const canonical = resolveMergedThreadId(current, allThreads);
-  if (canonical && filtered.some((t) => t.id === canonical)) return canonical;
-  return filtered[0]?.id ?? canonical ?? current;
+function pickActiveThread(current: string, filtered: Thread[]): string {
+  if (filtered.some((t) => t.id === current)) return current;
+  return filtered[0]?.id ?? current;
 }
 
 interface InboxState {
@@ -100,7 +98,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const filtered = filterInboxThreads(threads, activeFolder, searchQuery, selectedOrgUserIds, searchMode);
     set({
       threads,
-      activeThread: pickActiveThread(activeThread, filtered, threads),
+      activeThread: pickActiveThread(activeThread, filtered),
     });
   },
   setLoading: (loading) => set({ loading }),
@@ -110,19 +108,16 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const filtered = filterInboxThreads(threads, key, searchQuery, selectedOrgUserIds, searchMode);
     set({
       activeFolder: key,
-      activeThread: pickActiveThread(activeThread, filtered, threads),
+      activeThread: pickActiveThread(activeThread, filtered),
     });
   },
-  setThread: (id) => {
-    const { threads } = get();
-    set({ activeThread: resolveMergedThreadId(id, threads) });
-  },
+  setThread: (id) => set({ activeThread: id }),
   setSearchQuery: (query) => {
     const { threads, activeFolder, searchMode, selectedOrgUserIds, activeThread } = get();
     const filtered = filterInboxThreads(threads, activeFolder, query, selectedOrgUserIds, searchMode);
     set({
       searchQuery: query,
-      activeThread: pickActiveThread(activeThread, filtered, threads),
+      activeThread: pickActiveThread(activeThread, filtered),
     });
   },
   setSearchMode: (mode) => {
@@ -130,7 +125,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const filtered = filterInboxThreads(threads, activeFolder, searchQuery, selectedOrgUserIds, mode);
     set({
       searchMode: mode,
-      activeThread: pickActiveThread(activeThread, filtered, threads),
+      activeThread: pickActiveThread(activeThread, filtered),
     });
   },
   toggleOrgUser: (userId) => {
@@ -141,7 +136,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const filtered = filterInboxThreads(threads, activeFolder, searchQuery, next, searchMode);
     set({
       selectedOrgUserIds: next,
-      activeThread: pickActiveThread(activeThread, filtered, threads),
+      activeThread: pickActiveThread(activeThread, filtered),
     });
   },
   clearOrgUserFilter: () => {
@@ -149,7 +144,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const filtered = filterInboxThreads(threads, activeFolder, searchQuery, [], searchMode);
     set({
       selectedOrgUserIds: [],
-      activeThread: pickActiveThread(activeThread, filtered, threads),
+      activeThread: pickActiveThread(activeThread, filtered),
     });
   },
   addUserTag: (threadId, tag) =>
@@ -239,7 +234,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
       const filtered = filterInboxThreads(threads, activeFolder, searchQuery, selectedOrgUserIds, searchMode);
       return {
         threads,
-        activeThread: pickActiveThread(activeThread, filtered, threads),
+        activeThread: pickActiveThread(activeThread, filtered),
       };
     }),
   promoteThreadStage: (threadId, fromStage) =>
