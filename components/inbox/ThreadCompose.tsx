@@ -207,6 +207,7 @@ export function ThreadCompose({ thread }: { thread: Thread }) {
   const handleReplySend = async () => {
     const body = text.trim();
     if (!body || sending || to.length === 0) return;
+    if (activeRole !== "hm" && activeRole !== "eng") return;
     setSending(true);
     setError(null);
     try {

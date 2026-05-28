@@ -10,6 +10,7 @@ import {
 } from "@/lib/inbox/thread-stages";
 import type { ThreadMessage } from "@/lib/types";
 import { useFilteredThreads, useInboxStore } from "@/stores/inbox-store";
+import { useRoleStore } from "@/stores/role-store";
 import { BlockedResolutionCard } from "./BlockedResolutionCard";
 import { CollapsedMessagesDivider } from "./CollapsedMessagesDivider";
 import { MessageBubble } from "./MessageBubble";
@@ -28,6 +29,7 @@ export function ThreadDetail() {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [scoreDialogStage, setScoreDialogStage] = useState<PipelineStage | null>(null);
   const activeThread = useInboxStore((s) => s.activeThread);
+  const activeRole = useRoleStore((s) => s.activeRole);
   const threads = useFilteredThreads();
   const addUserTag = useInboxStore((s) => s.addUserTag);
   const removeUserTag = useInboxStore((s) => s.removeUserTag);
@@ -191,7 +193,7 @@ export function ThreadDetail() {
           ];
         })}
       </div>
-      <ThreadCompose thread={t} />
+      {activeRole !== "jill" ? <ThreadCompose thread={t} /> : null}
       <ThreadCommentsPanel thread={t} open={commentsOpen} onClose={() => setCommentsOpen(false)} />
       {scoreDialogStage && t.stageScores?.[scoreDialogStage] && (
         <StageScoreDialog

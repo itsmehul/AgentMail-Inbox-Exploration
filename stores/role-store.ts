@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 
-export type ActiveRole = "hm" | "eng";
+export type ActiveRole = "jill" | "hm" | "eng";
 
 interface RoleState {
   activeRole: ActiveRole;

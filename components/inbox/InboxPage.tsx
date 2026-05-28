@@ -1,28 +1,42 @@
 "use client";
 
 import { computeFolders } from "@/lib/inbox/folders";
+import { filterInboxThreads } from "@/stores/inbox-store";
 import type { Folder } from "@/lib/types";
 import { useInboxStore } from "@/stores/inbox-store";
+import { useRoleStore } from "@/stores/role-store";
 import Link from "next/link";
+import { useMemo } from "react";
 import { InboxResetButton } from "./InboxResetButton";
 import { InboxToolbar } from "./InboxToolbar";
 import { RoleSwitcher } from "./RoleSwitcher";
 import { ThreadDetail } from "./ThreadDetail";
 import { ThreadList } from "./ThreadList";
 import { useInboxLiveSync } from "./useInboxLiveSync";
+import { useInboxRoleSync } from "./useInboxRoleSync";
 import { useInboxUrlSync } from "./useInboxUrlSync";
 
 export function InboxPage() {
   useInboxLiveSync();
   useInboxUrlSync();
+  useInboxRoleSync();
 
   const threads = useInboxStore((s) => s.threads);
   const loading = useInboxStore((s) => s.loading);
   const error = useInboxStore((s) => s.error);
   const activeFolder = useInboxStore((s) => s.activeFolder);
+  const searchQuery = useInboxStore((s) => s.searchQuery);
+  const searchMode = useInboxStore((s) => s.searchMode);
+  const selectedOrgUserIds = useInboxStore((s) => s.selectedOrgUserIds);
   const setFolder = useInboxStore((s) => s.setFolder);
+  const activeRole = useRoleStore((s) => s.activeRole);
 
-  const folders = computeFolders(threads);
+  const roleThreads = useMemo(
+    () => filterInboxThreads(threads, "all", searchQuery, selectedOrgUserIds, searchMode, activeRole),
+    [threads, searchQuery, selectedOrgUserIds, searchMode, activeRole]
+  );
+
+  const folders = computeFolders(roleThreads);
   const main = folders.filter((f) => f.section === "main");
   const stages = folders.filter((f) => f.section === "stage");
   const chats = folders.filter((f) => f.section === "chat");
@@ -55,7 +69,8 @@ export function InboxPage() {
             Inbox
           </h1>
           <div className="settings-sub" style={{ margin: "4px 0 0" }}>
-            Unified inbox across Jill, HM, and Eng — live from AgentMail with pipeline threads merged by candidate.
+            Viewing {activeRole === "jill" ? "Jill" : activeRole === "hm" ? "HM" : "Eng"} inbox — pipeline
+            threads merged by candidate, live from AgentMail.
           </div>
         </div>
 

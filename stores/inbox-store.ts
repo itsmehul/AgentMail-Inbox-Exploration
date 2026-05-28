@@ -7,7 +7,10 @@ import { applyBlockedResolution, isBlockedThread } from "@/lib/inbox/blocked-thr
 import { FOLDER_DEFS } from "@/lib/inbox/folders";
 import { getNextStage, STAGE_LABELS, type PipelineStage } from "@/lib/inbox/thread-stages";
 import { threadInvolvesAnyOrgUsers } from "@/lib/inbox/thread-org-users";
+import { threadMatchesActiveRole } from "@/lib/inbox/role-filter";
 import { ORG_USERS } from "@/lib/mock/org-users";
+import type { ActiveRole } from "@/stores/role-store";
+import { useRoleStore } from "@/stores/role-store";
 import type { BlockResolutionPayload, PipelineStageId, StageScoreEntry, Thread } from "@/lib/types";
 
 function threadsForFolder(key: string, threads: Thread[]): Thread[] {
@@ -42,14 +45,17 @@ export function filterInboxThreads(
   folder: string,
   searchQuery: string,
   selectedOrgUserIds: string[],
-  searchMode: SearchMode = "query"
+  searchMode: SearchMode = "query",
+  activeRole: ActiveRole = useRoleStore.getState().activeRole
 ): Thread[] {
+  void searchMode;
   return threadsForFolder(folder, threads)
     .filter((t) => matchesSearch(t, searchQuery))
-    .filter((t) => threadInvolvesAnyOrgUsers(t, selectedOrgUserIds, ORG_USERS));
+    .filter((t) => threadInvolvesAnyOrgUsers(t, selectedOrgUserIds, ORG_USERS))
+    .filter((t) => threadMatchesActiveRole(t, activeRole));
 }
 
-function pickActiveThread(current: string, filtered: Thread[]): string {
+export function pickActiveThread(current: string, filtered: Thread[]): string {
   if (filtered.some((t) => t.id === current)) return current;
   return filtered[0]?.id ?? current;
 }
@@ -265,8 +271,9 @@ export function useFilteredThreads(): Thread[] {
   const searchQuery = useInboxStore((s) => s.searchQuery);
   const searchMode = useInboxStore((s) => s.searchMode);
   const selectedOrgUserIds = useInboxStore((s) => s.selectedOrgUserIds);
+  const activeRole = useRoleStore((s) => s.activeRole);
   return useMemo(
-    () => filterInboxThreads(threads, activeFolder, searchQuery, selectedOrgUserIds, searchMode),
-    [activeFolder, threads, searchQuery, searchMode, selectedOrgUserIds]
+    () => filterInboxThreads(threads, activeFolder, searchQuery, selectedOrgUserIds, searchMode, activeRole),
+    [activeFolder, threads, searchQuery, searchMode, selectedOrgUserIds, activeRole]
   );
 }

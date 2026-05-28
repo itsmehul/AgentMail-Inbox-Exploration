@@ -3,6 +3,7 @@
 import { useRoleStore, type ActiveRole } from "@/stores/role-store";
 
 const ROLES: { id: ActiveRole; label: string }[] = [
+  { id: "jill", label: "Jill" },
   { id: "hm", label: "HM" },
   { id: "eng", label: "Eng" },
 ];
