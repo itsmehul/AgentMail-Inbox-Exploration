@@ -1,4 +1,4 @@
-import { pipelineLogicalId } from "@/lib/inbox/pipeline-link";
+import { pipelineLogicalId } from "@/lib/inbox/pipeline-id";
 import type { Thread } from "@/lib/types";
 
 function normalizeEmail(email: string | undefined): string | undefined {

@@ -8,11 +8,10 @@ import {
   type DbThreadRow,
 } from "@/lib/db/inbox-repository";
 import { parseEmailAddress, normalizeEmailList } from "@/lib/agentmail/config";
+import { pipelineLogicalId } from "@/lib/inbox/pipeline-id";
 import { isPipelineIntroSubject } from "@/lib/inbox/subject-match";
 
-export function pipelineLogicalId(jillThreadId: string): string {
-  return `pipe_${jillThreadId}`;
-}
+export { pipelineLogicalId };
 
 export function resolveLogicalThreadForMessage(input: {
   threadId: string;
