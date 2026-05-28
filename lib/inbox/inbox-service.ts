@@ -18,7 +18,7 @@ import {
   isBlockedRecipientError,
   unblockSendRecipient,
 } from "@/lib/agentmail/recipient-lists";
-import { fetchInboxMessage } from "@/lib/agentmail/message-fetch";
+import { fetchInboxMessage, isAgentMailNotFound } from "@/lib/agentmail/message-fetch";
 import {
   isProcessableWebhookEvent,
   normalizeWebhookEvent,
@@ -83,20 +83,48 @@ async function sendWithRecipientRetry<T>(
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function sendAckReply(
   client: ReturnType<typeof createAgentMailClient>,
   inboxId: string,
   triggerMessageId: string,
   senderEmail: string,
-  ackText: string
+  ackText: string,
+  subjectFallback?: string
 ) {
   await ensureSendAllowed(client, inboxId, senderEmail);
-  return sendWithRecipientRetry(client, inboxId, () =>
+
+  const reply = () =>
     client.inboxes.messages.reply(inboxId, triggerMessageId, {
       to: [senderEmail],
       text: ackText,
-    })
-  );
+    });
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await sendWithRecipientRetry(client, inboxId, reply);
+    } catch (error) {
+      if (!isAgentMailNotFound(error) || attempt >= 3) {
+        if (isAgentMailNotFound(error) && subjectFallback) {
+          console.warn(`Reply to message ${triggerMessageId} failed with 404 even after retries. Falling back to sending a new message.`);
+          const sendNew = () =>
+            client.inboxes.messages.send(inboxId, {
+              to: [senderEmail],
+              subject: subjectFallback.startsWith("Re:") ? subjectFallback : `Re: ${subjectFallback}`,
+              text: ackText,
+            });
+          return await sendWithRecipientRetry(client, inboxId, sendNew);
+        }
+        throw error;
+      }
+      await sleep(300 * (attempt + 1));
+    }
+  }
+
+  throw new Error("Unreachable");
 }
 
 async function sendNewIntroEmail(
@@ -168,11 +196,19 @@ export async function maybeHandleFirstCandidateInbound(
   const ackText = buildAckBody(prospect);
   const introText = buildIntroBody(prospect);
   const introSubject = buildIntroSubject(prospect);
+  const resolvedTriggerId = inbound.message_id || triggerMessageId;
 
   try {
-    const ackSent = await sendAckReply(client, inboxId, triggerMessageId, sender.email, ackText);
+    const ackSent = await sendAckReply(
+      client,
+      inboxId,
+      resolvedTriggerId,
+      sender.email,
+      ackText,
+      inbound.subject
+    );
     if (ackSent.messageId) {
-      const ackFull = await fetchInboxMessage(client, inboxId, String(ackSent.messageId));
+      const ackFull = await fetchInboxMessage(client, inboxId, String(ackSent.messageId), { retries: 5 });
       if (ackFull) persistAgentMailMessage(ackFull, jillEmail, "jill");
     }
 
@@ -186,7 +222,7 @@ export async function maybeHandleFirstCandidateInbound(
     );
 
     if (introSent.messageId) {
-      const introFull = await fetchInboxMessage(client, inboxId, String(introSent.messageId));
+      const introFull = await fetchInboxMessage(client, inboxId, String(introSent.messageId), { retries: 5 });
       if (!introFull) {
         setIntroSent(threadId);
         return true;

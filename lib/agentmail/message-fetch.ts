@@ -3,7 +3,8 @@ import type { AgentMailClient } from "agentmail";
 import { AgentMailError } from "agentmail";
 
 export function isAgentMailNotFound(error: unknown): boolean {
-  return error instanceof AgentMailError && error.statusCode === 404;
+  if (error instanceof AgentMailError && error.statusCode === 404) return true;
+  return (error as { statusCode?: number } | undefined)?.statusCode === 404;
 }
 
 function sleep(ms: number): Promise<void> {
