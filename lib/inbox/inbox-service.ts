@@ -191,6 +191,7 @@ export async function maybeHandleFirstCandidateInbound(
       status: "ack sent",
       lastAction: "Ack",
       threadKind: "inbound",
+      logicalThreadId,
     });
 
     upsertThread({

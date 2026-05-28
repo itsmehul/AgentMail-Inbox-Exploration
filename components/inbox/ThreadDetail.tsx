@@ -10,6 +10,7 @@ import {
 } from "@/lib/inbox/thread-stages";
 import type { ThreadMessage } from "@/lib/types";
 import { useFilteredThreads, useInboxStore } from "@/stores/inbox-store";
+import { findThreadByAnyId } from "@/lib/inbox/resolve-merged-thread";
 import { BlockedResolutionCard } from "./BlockedResolutionCard";
 import { CollapsedMessagesDivider } from "./CollapsedMessagesDivider";
 import { MessageBubble } from "./MessageBubble";
@@ -28,12 +29,12 @@ export function ThreadDetail() {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [scoreDialogStage, setScoreDialogStage] = useState<PipelineStage | null>(null);
   const activeThread = useInboxStore((s) => s.activeThread);
+  const allThreads = useInboxStore((s) => s.threads);
   const threads = useFilteredThreads();
   const addUserTag = useInboxStore((s) => s.addUserTag);
   const removeUserTag = useInboxStore((s) => s.removeUserTag);
 
-  let t = threads.find((x) => x.id === activeThread);
-  if (!t && threads.length) t = threads[0];
+  const t = findThreadByAnyId(allThreads, activeThread) ?? threads[0];
 
   const threadId = t?.id ?? "";
   const messageCount = t?.messages.length ?? 0;
