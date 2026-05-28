@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { fetchInboxThreads, syncInboxThreads } from "@/lib/inbox/fetch-inbox";
+import { runInboxBootstrap } from "@/lib/inbox/app-bootstrap";
+import { fetchInboxThreads } from "@/lib/inbox/fetch-inbox";
 import { useInboxStore } from "@/stores/inbox-store";
 
 export function useInboxLiveSync() {
@@ -16,9 +17,10 @@ export function useInboxLiveSync() {
     async function load(initial = false) {
       try {
         if (initial) setLoading(true);
-        const result = initial ? await syncInboxThreads() : { threads: await fetchInboxThreads() };
+        if (initial) await runInboxBootstrap();
+        const threads = await fetchInboxThreads();
         if (cancelled) return;
-        setThreads(result.threads);
+        setThreads(threads);
         setError(null);
       } catch (error) {
         if (cancelled) return;

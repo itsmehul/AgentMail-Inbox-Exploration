@@ -351,7 +351,7 @@ export async function syncInboxFromAgentMail(): Promise<{ threadCount: number; s
   }
 
   for (const logicalId of listPipelineLogicalIds()) {
-    for (const role of ["hm", "eng"] as const) {
+    for (const role of ["jill", "hm", "eng"] as const) {
       try {
         await ensurePipelineRoleLink(logicalId, role);
       } catch (error) {

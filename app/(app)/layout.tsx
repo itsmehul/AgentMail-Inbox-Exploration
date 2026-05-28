@@ -1,3 +1,4 @@
+import { AppBootstrap } from "@/components/layout/AppBootstrap";
 import { AppGrid } from "@/components/layout/AppGrid";
 import { ChangesHelpButton } from "@/components/layout/ChangesHelpButton";
 import { LeftNav } from "@/components/layout/LeftNav";
@@ -17,6 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <AppBootstrap />
       <Topbar />
       <AppGrid>
         <LeftNav />
