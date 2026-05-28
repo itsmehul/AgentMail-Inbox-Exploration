@@ -20,11 +20,13 @@ import {
 } from "@/lib/agentmail/recipient-lists";
 import { normalizeWebhookEvent, type RawWebhookPayload } from "@/lib/agentmail/webhook-normalize";
 import {
+  findPipelineByCandidateEmail,
   getFirstInboundMessage,
   isIntroSent,
   listPipelineLogicalIds,
   markEventProcessed,
   setIntroSent,
+  tryClaimIntroProcessing,
   upsertThread,
   upsertThreadInboxLink,
   findPipelineByIntroSubject,
@@ -152,6 +154,13 @@ export async function maybeHandleFirstCandidateInbound(
   const sender = parseEmailAddress(inbound.from_addr);
   if (!sender.email) return false;
 
+  if (findPipelineByCandidateEmail(sender.email)) {
+    setIntroSent(threadId);
+    return false;
+  }
+
+  if (!tryClaimIntroProcessing(threadId)) return false;
+
   const client = createAgentMailClient();
   const ackText = buildAckBody(prospect);
   const introText = buildIntroBody(prospect);
@@ -215,12 +224,6 @@ export async function maybeHandleFirstCandidateInbound(
       thread_id: String(introSent.threadId),
       role: "jill",
     });
-
-    try {
-      await ensurePipelineRoleLink(logicalThreadId, "hm");
-    } catch (error) {
-      console.warn("Could not link HM inbox for new pipeline:", error);
-    }
   } else {
     setIntroSent(threadId);
   }

@@ -25,11 +25,10 @@ import {
   type DbThreadRow,
   type ThreadInboxLink,
 } from "@/lib/db/inbox-repository";
-import { buildIntroBody } from "@/lib/inbox/intro-template";
+import { buildRoleInboxBootstrapBody } from "@/lib/inbox/intro-template";
 import { persistAgentMailMessage } from "@/lib/inbox/persist-message";
 import { isPipelineIntroSubject, subjectsMatchPipeline } from "@/lib/inbox/subject-match";
 import { threadHeaderFromMessage } from "@/lib/inbox/thread-mapper";
-import type { Prospect } from "@/lib/types";
 
 const THREAD_LIST_LIMIT = 100;
 
@@ -48,15 +47,6 @@ async function sendWithAllowlistRetry<T>(
       return sendFn();
     }
     throw error;
-  }
-}
-
-function prospectFromPipeline(row: DbThreadRow): Prospect | null {
-  if (!row.prospect_json) return null;
-  try {
-    return JSON.parse(row.prospect_json) as Prospect;
-  } catch {
-    return null;
   }
 }
 
@@ -172,15 +162,25 @@ async function bootstrapPipelineRoleLink(
   if (!latest) return undefined;
 
   const candidateEmail = pipeline.candidate_email?.toLowerCase();
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const matchedThreadId = await findMatchingRoleThreadInInbox(
+      client,
+      roleInboxId,
+      introSubject,
+      candidateEmail ?? undefined
+    );
+    if (matchedThreadId) {
+      return syncRoleThread(logicalThreadId, role, roleInboxId, matchedThreadId, introSubject);
+    }
+  }
+
   const to = candidateEmail ? [roleEmail, candidateEmail] : [roleEmail];
   for (const addr of to) {
     await ensureSendAllowed(client, jillThread.inboxId, addr);
   }
 
-  const prospect = prospectFromPipeline(pipeline);
-  const text = prospect
-    ? buildIntroBody(prospect)
-    : "Looping you into this hiring pipeline thread.\n\n— jill-diy";
+  const text = buildRoleInboxBootstrapBody();
 
   try {
     const sent = await sendWithAllowlistRetry(client, jillThread.inboxId, () =>

@@ -17,3 +17,8 @@ I'm Cc'd here and can help with scheduling, take-homes, and next steps. Reply-al
 
 — jill-diy`;
 }
+
+/** Short forward when linking HM/Eng inboxes — never repeat the full intro body. */
+export function buildRoleInboxBootstrapBody(): string {
+  return "Looping you into this hiring pipeline thread.\n\n— jill-diy";
+}

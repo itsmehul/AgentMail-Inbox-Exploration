@@ -91,6 +91,17 @@ export function isIntroSent(threadId: string): boolean {
   return Boolean(row?.intro_sent);
 }
 
+/** Atomically mark an inbound thread as intro-processed so webhook + sync cannot double-send. */
+export function tryClaimIntroProcessing(threadId: string): boolean {
+  const result = getDb()
+    .prepare(
+      `UPDATE threads SET intro_sent = 1, status = 'processing intro', last_action = 'Ack', updated_at = datetime('now')
+       WHERE thread_id = ? AND intro_sent = 0`
+    )
+    .run(threadId);
+  return result.changes > 0;
+}
+
 export function setIntroSent(threadId: string) {
   getDb()
     .prepare("UPDATE threads SET intro_sent = 1, status = ?, last_action = ?, updated_at = datetime('now') WHERE thread_id = ?")
