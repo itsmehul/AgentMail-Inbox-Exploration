@@ -18,7 +18,12 @@ import {
   isBlockedRecipientError,
   unblockSendRecipient,
 } from "@/lib/agentmail/recipient-lists";
-import { normalizeWebhookEvent, type RawWebhookPayload } from "@/lib/agentmail/webhook-normalize";
+import { fetchInboxMessage } from "@/lib/agentmail/message-fetch";
+import {
+  isProcessableWebhookEvent,
+  normalizeWebhookEvent,
+  type RawWebhookPayload,
+} from "@/lib/agentmail/webhook-normalize";
 import {
   findPipelineByCandidateEmail,
   getFirstInboundMessage,
@@ -45,10 +50,6 @@ import { ensurePipelineRoleLink } from "@/lib/inbox/role-thread-link";
 import { isPipelineIntroSubject } from "@/lib/inbox/subject-match";
 import { broadcastInboxChanged } from "@/lib/inbox/sse-hub";
 import { threadHeaderFromMessage } from "@/lib/inbox/thread-mapper";
-
-function isProcessableWebhookEvent(eventType: string): boolean {
-  return eventType === "message.received" || eventType === "message.delivered";
-}
 
 function resolveInboxRole(
   roles: Awaited<ReturnType<typeof resolveAllRoleInboxes>>,
@@ -171,8 +172,8 @@ export async function maybeHandleFirstCandidateInbound(
   try {
     const ackSent = await sendAckReply(client, inboxId, triggerMessageId, sender.email, ackText);
     if (ackSent.messageId) {
-      const ackFull = await client.inboxes.messages.get(inboxId, ackSent.messageId);
-      persistAgentMailMessage(ackFull, jillEmail, "jill");
+      const ackFull = await fetchInboxMessage(client, inboxId, String(ackSent.messageId));
+      if (ackFull) persistAgentMailMessage(ackFull, jillEmail, "jill");
     }
 
     const introSent = await sendNewIntroEmail(
@@ -185,7 +186,11 @@ export async function maybeHandleFirstCandidateInbound(
     );
 
     if (introSent.messageId) {
-      const introFull = await client.inboxes.messages.get(inboxId, introSent.messageId);
+      const introFull = await fetchInboxMessage(client, inboxId, String(introSent.messageId));
+      if (!introFull) {
+        setIntroSent(threadId);
+        return true;
+      }
       persistAgentMailMessage(introFull, jillEmail, "jill");
 
       const logicalThreadId = pipelineLogicalId(String(introSent.threadId));
@@ -295,7 +300,11 @@ export async function handleMessageReceivedEvent(event: {
     messageCount === 1 &&
     !isIntroSent(threadId)
   ) {
-    await maybeHandleFirstCandidateInbound(threadId, inboxId, String(message.messageId));
+    try {
+      await maybeHandleFirstCandidateInbound(threadId, inboxId, String(message.messageId));
+    } catch (error) {
+      console.warn(`Intro flow failed for thread ${threadId}:`, error);
+    }
   }
 
   broadcastInboxChanged(isInboundReceived ? "message_received" : "message_delivered");
@@ -313,53 +322,68 @@ async function syncSingleInbox(inboxId: string, email: string, role: RoleInbox):
   let synced = 0;
 
   for (const item of listed.threads) {
-    const full = await client.inboxes.threads.get(inboxId, item.threadId);
-    for (const message of full.messages) {
-      persistAgentMailMessage(message, jillEmail, role);
-    }
+    try {
+      const full = await client.inboxes.threads.get(inboxId, item.threadId);
+      for (const message of full.messages) {
+        persistAgentMailMessage(message, jillEmail, role);
+      }
 
-    const last = full.messages.at(-1);
-    if (last) {
-      const header = threadHeaderFromMessage(last);
-      const subject = full.subject ?? header.subject;
-      const isPipeline = isPipelineIntroSubject(subject);
-      const existing = getThreadRow(String(full.threadId));
-      const matched = isPipeline ? findPipelineByIntroSubject(subject) : undefined;
-      const logicalId =
-        existing?.logical_thread_id ??
-        matched?.logical_thread_id ??
-        (isPipeline && role === "jill" ? pipelineLogicalId(String(full.threadId)) : null);
+      const last = full.messages.at(-1);
+      if (last) {
+        const header = threadHeaderFromMessage(last);
+        const subject = full.subject ?? header.subject;
+        const isPipeline = isPipelineIntroSubject(subject);
+        const existing = getThreadRow(String(full.threadId));
+        const matched = isPipeline ? findPipelineByIntroSubject(subject) : undefined;
+        const logicalId =
+          existing?.logical_thread_id ??
+          matched?.logical_thread_id ??
+          (isPipeline && role === "jill" ? pipelineLogicalId(String(full.threadId)) : null);
 
-      upsertThread({
-        threadId: String(full.threadId),
-        inboxId,
-        subject,
-        preview: full.preview ?? header.preview,
-        fromDisplay: full.senders[0] ?? header.fromDisplay,
-        timeDisplay: header.timeDisplay,
-        messageCount: full.messageCount,
-        threadKind: isPipeline ? "pipeline" : role === "jill" ? "inbound" : undefined,
-        logicalThreadId: logicalId,
-      });
-
-      if (isPipeline && logicalId) {
-        upsertThreadInboxLink({
-          logical_thread_id: logicalId,
-          inbox_id: inboxId,
-          thread_id: String(full.threadId),
-          role,
+        upsertThread({
+          threadId: String(full.threadId),
+          inboxId,
+          subject,
+          preview: full.preview ?? header.preview,
+          fromDisplay: full.senders[0] ?? header.fromDisplay,
+          timeDisplay: header.timeDisplay,
+          messageCount: full.messageCount,
+          threadKind: isPipeline ? "pipeline" : role === "jill" ? "inbound" : undefined,
+          logicalThreadId: logicalId,
         });
-      }
-    }
 
-    if (role === "jill" && !isIntroSent(String(full.threadId)) && full.messageCount === 1) {
-      const first = full.messages[0];
-      if (first && !isJillAddress(first.from ?? "", jillEmail)) {
-        await maybeHandleFirstCandidateInbound(String(full.threadId), inboxId, String(first.messageId));
+        if (isPipeline && logicalId) {
+          upsertThreadInboxLink({
+            logical_thread_id: logicalId,
+            inbox_id: inboxId,
+            thread_id: String(full.threadId),
+            role,
+          });
+        }
       }
-    }
 
-    synced += 1;
+      if (role === "jill" && !isIntroSent(String(full.threadId)) && full.messageCount === 1) {
+        const first = full.messages[0];
+        if (first && !isJillAddress(first.from ?? "", jillEmail)) {
+          try {
+            await maybeHandleFirstCandidateInbound(
+              String(full.threadId),
+              inboxId,
+              String(first.messageId)
+            );
+          } catch (error) {
+            console.warn(
+              `Intro flow skipped for thread ${full.threadId} during sync:`,
+              error
+            );
+          }
+        }
+      }
+
+      synced += 1;
+    } catch (error) {
+      console.warn(`Skipping thread ${item.threadId} during sync for ${role}:`, error);
+    }
   }
 
   return synced;
@@ -395,7 +419,18 @@ export async function syncInboxFromAgentMail(): Promise<{ threadCount: number; s
 }
 
 export async function ingestWebhookPayload(payload: unknown) {
-  const event = normalizeWebhookEvent(payload as RawWebhookPayload);
+  const raw = payload as RawWebhookPayload;
+  const eventType = raw.event_type ?? "message.received";
+  const eventId = raw.event_id ?? `evt_${Date.now()}`;
+
+  if (isEventProcessed(eventId)) return;
+
+  if (!isProcessableWebhookEvent(eventType)) {
+    markEventProcessed(eventId);
+    return;
+  }
+
+  const event = normalizeWebhookEvent(raw);
   if (isEventProcessed(event.event_id)) return;
 
   let message = event.message;
@@ -404,7 +439,15 @@ export async function ingestWebhookPayload(payload: unknown) {
 
   if (event.needsFetch && message.messageId) {
     const client = createAgentMailClient();
-    message = await client.inboxes.messages.get(inboxApiId, String(message.messageId));
+    const fetched = await fetchInboxMessage(client, inboxApiId, String(message.messageId), {
+      fallback: message,
+    });
+    if (fetched) {
+      message = fetched;
+    } else if (!message.text?.trim() && !message.preview?.trim() && !message.html?.trim()) {
+      markEventProcessed(event.event_id);
+      return;
+    }
   }
 
   await handleMessageReceivedEvent({

@@ -42,7 +42,13 @@ export type RawWebhookPayload = {
   message?: RawMessage;
   thread?: RawThread;
   delivery?: RawDelivery;
+  /** Outbound send notifications (message.sent) use `send`, not `message`. */
+  send?: RawDelivery;
 };
+
+export function isProcessableWebhookEvent(eventType: string): boolean {
+  return eventType === "message.received" || eventType === "message.delivered";
+}
 
 export type NormalizedWebhookEvent = {
   type: "event";
@@ -108,7 +114,10 @@ export function normalizeWebhookEvent(payload: RawWebhookPayload): NormalizedWeb
   const eventType = payload.event_type ?? "message.received";
   const eventId = payload.event_id ?? `evt_${Date.now()}`;
 
-  const rawMessage = payload.message ?? (payload.delivery ? deliveryToMessage(payload.delivery) : undefined);
+  const rawMessage =
+    payload.message ??
+    (payload.delivery ? deliveryToMessage(payload.delivery) : undefined) ??
+    (payload.send ? deliveryToMessage(payload.send) : undefined);
   const messageId = rawMessageId(rawMessage);
 
   if (!messageId) {
@@ -116,9 +125,10 @@ export function normalizeWebhookEvent(payload: RawWebhookPayload): NormalizedWeb
   }
 
   const message = normalizeMessage({ ...rawMessage, message_id: messageId });
-  const isDeliveryEvent = eventType === "message.delivered" || Boolean(payload.delivery);
+  const isDeliveryEvent =
+    eventType === "message.delivered" || Boolean(payload.delivery) || eventType === "message.sent";
   const hasBody = Boolean(message.text?.trim() || message.preview?.trim() || message.html?.trim());
-  const needsFetch = isDeliveryEvent || !hasBody;
+  const needsFetch = isProcessableWebhookEvent(eventType) && (isDeliveryEvent || !hasBody);
 
   const thread = payload.thread
     ? {
